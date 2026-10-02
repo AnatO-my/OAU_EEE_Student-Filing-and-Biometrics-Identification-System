@@ -1,6 +1,6 @@
 # OAU EEE Student Records & Identification System
 
-A departmental student filing system for the Electrical and Electronic Engineering project at Obafemi Awolowo University (OAU). It will organise student files and academic records, with a controlled interface to a separate student identity terminal.
+A departmental student-records platform for the Electrical and Electronic Engineering project at Obafemi Awolowo University (OAU), with a controlled interface to a separate student identity terminal.
 
 ## Project status
 
@@ -94,12 +94,8 @@ There are no install, migration, server, or test commands yet. Once the applicat
 6. Add staged imports, safe re-import, and period-specific exports.
 7. Verify expiry, replay protection, device revocation, recovery, and staff usability before a supervised pilot.
 
-## Filing-system decisions
-
-Before implementing document storage, agree file categories, reference numbers, permitted file types and sizes, upload/download permissions, revision and correction history, retention and archive rules, and backup recovery. Use private storage with server-side access checks; define validation and malware scanning before accepting uploaded documents.
-
 ## Contributing
 
-Read [CONTRIBUTING.md](CONTRIBUTING.md) for branch, review, validation, and data-handling rules. Use a branch for each focused change and submit a pull request describing the behaviour, validation performed, and any unresolved decisions. Keep documentation and contracts aligned with implementation. Changes to academic rules, access policies, and data-source assumptions require review by the appropriate project or departmental owner.
+Use a branch for each focused change and submit a pull request describing the behaviour, validation performed, and any unresolved decisions. Keep documentation and contracts aligned with implementation. Changes to academic rules, access policies, and data-source assumptions require review by the appropriate project or departmental owner.
 
 No software licence has been selected yet. Record the agreed licence and repository ownership before broader distribution.
