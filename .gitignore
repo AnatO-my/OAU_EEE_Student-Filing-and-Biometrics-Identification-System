@@ -36,3 +36,13 @@ backups/
 .idea/
 Thumbs.db
 .DS_Store
+
+# Local working data and temporary output
+/local-data/
+/private-data/
+/tmp/
+.coverage.*
+coverage.xml
+junit.xml
+*.bak
+*.tmp
