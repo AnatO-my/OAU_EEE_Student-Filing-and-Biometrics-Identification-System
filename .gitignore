@@ -1,0 +1,38 @@
+# Local secrets
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# Python environments and generated files
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+*.egg-info/
+build/
+dist/
+
+# Local databases, data transfers, and generated output
+*.sqlite3
+*.sqlite3-journal
+*.dump
+*.sql.gz
+media/
+staticfiles/
+uploads/
+exports/
+backups/
+*.log
+
+# Machine-specific editor and OS files
+.vscode/
+.idea/
+Thumbs.db
+.DS_Store
