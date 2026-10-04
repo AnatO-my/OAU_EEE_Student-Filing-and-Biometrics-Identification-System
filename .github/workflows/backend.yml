@@ -1,0 +1,38 @@
+name: Backend checks
+on:
+  push:
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: filing_test
+          POSTGRES_USER: filing_test
+          POSTGRES_PASSWORD: synthetic-ci-only
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U filing_test -d filing_test"
+          --health-interval 10s --health-timeout 5s --health-retries 5
+    env:
+      DJANGO_SETTINGS_MODULE: config.ci_settings
+      POSTGRES_DB: filing_test
+      POSTGRES_USER: filing_test
+      POSTGRES_PASSWORD: synthetic-ci-only
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - run: python -m pip install -r requirements.txt
+      - run: python manage.py check
+        working-directory: app
+      - run: python manage.py makemigrations --check --dry-run
+        working-directory: app
+      - run: python manage.py test students accounts
+        working-directory: app

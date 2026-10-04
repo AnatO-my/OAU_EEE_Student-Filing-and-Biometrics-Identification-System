@@ -4,7 +4,7 @@ A departmental student filing system for the Electrical and Electronic Engineeri
 
 ## Project status
 
-This repository currently contains the initial directory scaffold and documentation. There is no runnable application, dependency configuration, database schema, or implemented terminal API yet. `pyproject.toml` and `.env.example` are placeholders.
+This repository now includes a Django backend foundation: custom staff accounts, Student and Guardian models/migrations, and staff-only student read/search/filter endpoints. Dependency versions are recorded in `requirements.txt`. PostgreSQL setup, fine-grained API permissions, JSON login, write/export endpoints, and the terminal API remain pending. See [backend setup and implementation status](docs/backend-foundation.md).
 
 The software design and delivery plan (SW-PLAN-01, version 0.1, 29 September 2026) informs this overview. Its architecture, stack, roles, assignments, schedule, and hosting choices are proposals pending review; this repository does not establish institutional approval.
 
@@ -31,7 +31,7 @@ A modular Django application would serve staff pages and a small, versioned JSON
 | Terminal interface | Django REST Framework, REST/JSON |
 | Collaboration | GitHub issues and pull requests; CI to be added |
 
-Exact runtime and dependency versions will be selected and recorded when implementation begins.
+Current development runtime is Python 3.13; installed dependency versions are recorded in `requirements.txt`.
 
 Fingerprint capture, biometric templates, and matching belong to the separate biometric subsystem. A successful identity match must not automatically grant access to academic records. The terminal contract should exchange only the information required for the authorised identity workflow.
 
@@ -67,13 +67,13 @@ software/          Reserved placeholder; purpose to be agreed
 pyproject.toml      Future Python project/dependency configuration
 ```
 
-The plan illustrates these software folders beneath `software/`; the existing scaffold uses root-level folders instead. Agree a canonical layout before implementation. Empty directories contain `.gitkeep` files so Git preserves them.
+The plan illustrates these software folders beneath `software/`; the existing scaffold uses root-level folders instead. The backend remains in `app/`; the separate React app will live in a root-level `frontend/` folder. Empty directories contain `.gitkeep` files so Git preserves them.
 
 ## Getting started
 
 Clone this repository and open its root in your editor. Review the scope and module boundaries before adding code.
 
-There are no install, migration, server, or test commands yet. Once the application is bootstrapped, document the supported Python version, dependency installation, local database setup, environment variables, synthetic fixtures, and test commands here. Do not treat the empty configuration files as a working setup.
+Follow [backend-foundation.md](docs/backend-foundation.md) for installation, configuration checks, isolated tests, API contracts, and pending database setup. Development settings still use SQLite; PostgreSQL remains the intended application database. The separate React frontend is maintained by the frontend developer.
 
 ## Data and access boundaries
 
