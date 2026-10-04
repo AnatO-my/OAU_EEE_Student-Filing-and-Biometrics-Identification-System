@@ -2,7 +2,7 @@
 
 ## Checkpoint: 4 October 2026
 
-Python 3.13, Django 5.2, Django REST Framework; exact development versions are in requirements.txt. Backend stays in app/. A separate React application will live in frontend/ when its developer creates it.
+Python 3.13, Django 5.2, Django REST Framework; exact development versions are in requirements.txt. pyproject.toml defines project metadata, Python compatibility, and packaging for the implemented Django apps; it reads dependencies from requirements.txt to avoid maintaining two dependency lists. Backend stays in app/. A separate React application will live in frontend/ when its developer creates it.
 
 Implemented: custom accounts.User extending AbstractUser and registered with UserAdmin; Student and Guardian models, serializers, migrations; staff-only student list/detail GET endpoints, search, validated filters, and pagination. No migrations have been applied to the development database as part of this checkpoint.
 
