@@ -148,3 +148,8 @@ REST_FRAMEWORK = {
         "rest_framework.permissions.IsAdminUser",
     ],
 }
+
+CURRENT_ACADEMIC_SESSION = os.environ.get(
+    "CURRENT_ACADEMIC_SESSION",
+    "",
+)

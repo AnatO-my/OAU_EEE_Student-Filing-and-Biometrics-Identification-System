@@ -4,7 +4,7 @@ A departmental student filing system for the Electrical and Electronic Engineeri
 
 ## Project status
 
-This repository now includes a Django backend foundation: custom staff accounts, Student and Guardian models/migrations, and staff-only student read/search/filter endpoints. Dependency versions are recorded in `requirements.txt`. PostgreSQL setup, fine-grained API permissions, JSON login, write/export endpoints, and the terminal API remain pending. See [backend setup and implementation status](docs/backend-foundation.md).
+This repository now includes a Django backend foundation: custom staff accounts, Student and Guardian models/migrations, and staff student read/search/filter endpoints with session/level adviser scope, a student own-profile endpoint, and adviser/message schemas. Dependency versions are recorded in `requirements.txt`. Local PostgreSQL setup, student login integration, message delivery, write/export endpoints, and the terminal API remain pending. Staff session login and read permissions are implemented. See [backend setup and implementation status](docs/backend-foundation.md).
 
 The software design and delivery plan (SW-PLAN-01, version 0.1, 29 September 2026) informs this overview. Its architecture, stack, roles, assignments, schedule, and hosting choices are proposals pending review; this repository does not establish institutional approval.
 

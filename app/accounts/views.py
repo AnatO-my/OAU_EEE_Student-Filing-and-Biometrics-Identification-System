@@ -2,7 +2,7 @@ from django.contrib.auth import login, logout
 from django.middleware.csrf import get_token
 from django.utils.decorators import method_decorator
 from django.views.decorators.cache import never_cache
-from django.views.decorators.csrf import ensure_csrf_cookie
+from django.views.decorators.csrf import csrf_protect, ensure_csrf_cookie
 from rest_framework import permissions, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -24,10 +24,9 @@ class CSRFTokenView(APIView):
 
 
 #class that starts a staff session and returns the authenticated identity
+@method_decorator(csrf_protect, name="dispatch")
 class LoginView(APIView):
-    #session authentication is deliberately skipped here, the client cannot present a
-    #csrf token before it has authenticated, and the credentials in the request body
-    #are what authorise the action
+    # Anonymous clients obtain a CSRF token from /api/auth/csrf/ before login.
     authentication_classes = []
     permission_classes = [permissions.AllowAny]
 

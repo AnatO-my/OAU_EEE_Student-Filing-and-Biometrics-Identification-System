@@ -71,10 +71,7 @@ response.
 
 React must send the sessionid cookie and return the csrf token in the X-CSRFToken header
 on every unsafe request. The token is rotated when the session changes, so the client
-must call GET /api/auth/csrf/ again after logging in. Login is the one unsafe endpoint
-that does not require a token first, because a client cannot have one before it has
-authenticated; the credentials in the request body authorise that request. Logout and
-all future unsafe endpoints are protected by session authentication and csrf.
+must call GET /api/auth/csrf/ before login and again after logging in. Anonymous clients can obtain a token before authentication. Login explicitly enforces CSRF; logout and authenticated writes use session authentication CSRF enforcement.
 
 Set DJANGO_CSRF_TRUSTED_ORIGINS to the frontend origin before developing against the
 React client, for example http://localhost:5173. It is read from the environment and
@@ -87,7 +84,7 @@ origins.
 
 The HOD will use Django admin (/admin/) with a superuser account to create/disable staff accounts, manage details/passwords, and assign groups/permissions. Django admin is its own interface; React does not automatically display it. Staff use React to interact with the JSON API. Passwords use Django hashing and password APIs, never direct raw assignment to the password field. The HOD account has not yet been created.
 
-IMPORTANT: Current student GET views only check is_staff. Assigning Django model permissions in admin does not yet limit these API views. Fine-grained authorization must be implemented and tested before live use. Django's default view/add/change/delete model permissions are available; export will need an explicit permission when implemented. Cohort and field restrictions remain undefined.
+Student staff reads require is_staff, view_student permission, and an active level assignment in CURRENT_ACADEMIC_SESSION. Active superusers can read all students. Empty session configuration, revoked assignments, and previous-session assignments grant no ordinary staff access. Detail requests outside scope return 404. HOD-only admin screens prevent staff bypassing API scope. Guardians have no API routes yet. Export will need an explicit permission; field-level restrictions remain pending.
 
 Session authentication is explicit. A separate React app does not automatically require JWT. Login/logout/current-user JSON endpoints and CSRF bootstrap are implemented; see "Authentication endpoints". Frontend origin/proxy settings and password-change/recovery flows are pending. React must never be the sole permission enforcement layer. Production CORS/CSRF/cookie settings depend on the chosen deployment addresses.
 
@@ -95,7 +92,7 @@ Session authentication is explicit. A separate React app does not automatically 
 
 1. Configure PostgreSQL locally and verify migrations there.
 2. Create the HOD superuser and verify staff account/group management.
-3. Enforce assigned permissions on direct API requests; add denied-access tests.
+3. Extend tested read permissions/scope enforcement to future write/export/guardian endpoints.
 4. JSON login/logout/current-user and CSRF bootstrap are implemented; see
    "Authentication endpoints". Coordinate React integration and agree the deployment
    origins; password-change and recovery flows are still pending.
@@ -103,3 +100,17 @@ Session authentication is explicit. A separate React app does not automatically 
 6. Add academic records and GPA/CGPA calculation rules later.
 
 Tests cover denied anonymous/nonstaff reads, search/filter/detail responses, invalid filters, pagination, unsupported writes, multiple guardians/deletion protection, and password hashing. Account tests cover the CSRF token and cookie, login success and failure, identical rejection of non staff and unknown accounts, staff-only current-user access, session teardown on logout, and that logout and other unsafe requests are refused without a CSRF token. They do not prove browser login against the React client, cross origin behaviour in the browser, or production readiness.
+
+## Checkpoint: 5 October 2026 — advisers and student profiles
+
+Custom User is shared by staff and students. Student.user is an optional one-to-one link, excluded from the general student serializer. Student accounts are nonstaff. GET /api/me/student/ retrieves only the profile linked to the authenticated account; it is read-only and returns 404 if no profile is linked. Existing JSON auth endpoints still accept staff only, so student session login integration remains pending. Endpoint tests use forced authentication and do not prove student browser login.
+
+AdviserAssignment stores staff, academic_session (YYYY/YYYY with consecutive years), level and active status; unique per staff/session/level. Model clean validates session and staff status; direct save does not invoke clean automatically. HOD-only admin screens allow creation/edit/deactivation, not deletion. Current scope uses current_level, not historical academic enrollment.
+
+Run setup_staff_groups only after migrations. It sets Student Readers to student/guardian view permissions and Student Editors to view/add/change permissions. Reruns replace permissions on these named groups but retain membership. Standard auth Group admin is controlled by Django permissions; group management should remain reserved for the HOD.
+
+Set CURRENT_ACADEMIC_SESSION in the environment. It defaults to empty, which denies ordinary staff record access. Advisers need both the action permission and a current active assignment. This policy currently gives all ordinary staff access only through adviser assignments; broader staff scopes are not implemented.
+
+AdviserMessage stores audience (individual/level), assignment, subject/body, timestamp, and explicit recipients. Recipient links survive level changes. Sending, recipient selection, permissions, read endpoints, receipts, and message administration are not implemented. Both individual messages and level announcements are required. Do not treat the model alone as a secure sending workflow.
+
+Local development/shared PostgreSQL setup is still paused. Migrations are applied only to isolated test databases in validation. Before connecting to the teammate's database, reconcile schema/account/identifier differences; do not apply our migrations to their existing schema blindly.
