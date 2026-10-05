@@ -3,11 +3,14 @@ from django.middleware.csrf import get_token
 from django.utils.decorators import method_decorator
 from django.views.decorators.cache import never_cache
 from django.views.decorators.csrf import csrf_protect, ensure_csrf_cookie
+from django.shortcuts import get_object_or_404
+
 from rest_framework import permissions, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from .serializers import CurrentUserSerializer, LoginSerializer
+from .serializers import CurrentUserSerializer, LoginSerializer, AdviserMessageSendSerializer
+from .services import get_message_assignment, send_adviser_message
 
 
 #class that issues the csrf cookie and returns its value so the React client can
@@ -54,3 +57,50 @@ class CurrentUserView(APIView):
 
     def get(self, request):
         return Response(CurrentUserSerializer(request.user).data)
+
+class AdviserMessageSendView(APIView):
+    permission_classes = [permissions.IsAdminUser]
+
+    def post(self, request):
+        serializer = AdviserMessageSendSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        message = send_adviser_message(
+            user=request.user,
+            validated_data=serializer.validated_data,
+        )
+
+        return Response(
+            {
+                "message_id": message.pk,
+                "audience": message.audience,
+                "subject": message.subject,
+                "recipient_count": message.recipients.count(),
+                "created_at": message.created_at.isoformat(),
+            },
+            status=status.HTTP_201_CREATED,
+        )
+
+class HODMessageSendView(APIView):
+    permission_classes = [permissions.AllowAny]
+    
+    def post(self, request):
+            serializer = HODMessageSendSerializer(data=request.data)
+            serializer.is_valid(raise_exception=True)
+    
+            message = send_adviser_message(
+                user=request.user,
+                validated_data=serializer.validated_data,
+            )
+    
+            return Response(
+                {
+                    "message_id": message.pk,
+                    "audience": message.audience,
+                    "subject": message.subject,
+                    "recipient_count": message.recipients.count(),
+                    "created_at": message.created_at.isoformat(),
+                },
+                status=status.HTTP_201_CREATED,
+            )
+    

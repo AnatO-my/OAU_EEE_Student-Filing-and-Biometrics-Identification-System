@@ -84,6 +84,80 @@ class AdviserMessage(models.Model):
 
     class Meta:
         ordering = ["-created_at", "-id"]
+        permissions = [
+            ("send_adviser_message", "Can send adviser messages"),
+        ]
 
     def __str__(self):
         return self.subject
+
+
+class HODMessage(models.Model):
+    class Audience(models.TextChoices):
+        ADVISER = "adviser", "Assigned Adivser"
+        INDIVIDUAL = "individual", "Individual student"
+        LEVEL = "level", "Assigned level"
+
+        assignment = models.ForeignKey(
+            HODAssignment,
+            on_delete=models.PROTECT,
+            related_name="messages",
+        )
+
+    audience = models.CharField(
+        max_length=20,
+        choices=Audience.choices,
+    )
+    subject = models.CharField(max_length=200)
+    body = models.TextField()
+    recipients = models.ManyToManyField(
+        "students.Student",
+        related_name="adviser_messages",
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+
+class HODAssignment(models.Model):
+    staff = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name="hod_assignments",
+    )
+    academic_session = models.CharField(max_length=9)
+    level = models.PositiveSmallIntegerField()
+    is_active = models.BooleanField(default=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["hod", "academic_session", "level"],
+                name="hod_session_level",
+            ),
+        ]
+
+    def __str__(self):
+        return (
+            f"{self.staff.username} — " f"{self.level} level ({self.academic_session})"
+        )
+
+    def clean(self):
+        super().clean()
+        errors = {}
+
+        if not re.fullmatch(r"[0-9]{4}/[0-9]{4}", self.academic_session):
+            errors["academic_session"] = "Use YYYY/YYYY, for example 2026/2027."
+        else:
+            start, end = map(int, self.academic_session.split("/"))
+            if end != start + 1:
+                errors["academic_session"] = (
+                    "The second year must immediately follow the first."
+                )
+
+        if self.staff_id and not self.staff.is_staff:
+            errors["staff"] = "Select a staff account."
+
+        if self.level == 0:
+            errors["level"] = "Level must be greater than zero."
+
+        if errors:
+            raise ValidationError(errors)

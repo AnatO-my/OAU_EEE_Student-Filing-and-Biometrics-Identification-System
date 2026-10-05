@@ -1,8 +1,14 @@
 from django.core.exceptions import ValidationError
-from django.test import SimpleTestCase, TestCase
+from django.test import SimpleTestCase, TestCase, override_settings
+from django.contrib.auth.models import Permission
+from django.core.exceptions import PermissionDenied
 
-from .models import AdviserAssignment, User, AdviserMessage
+from rest_framework.exceptions import ValidationError as APIValidationError
+from rest_framework.test import APIClient
+
 from students.models import Student
+from .models import AdviserAssignment, User, AdviserMessage
+from .services import send_adviser_message
 
 
 class AdviserAssignmentValidationTests(SimpleTestCase):
@@ -79,15 +85,10 @@ class AdviserMessageTests(TestCase):
         self.assertTrue(student.adviser_messages.filter(pk=message.pk).exists())
 
 
-from django.contrib.auth import get_user_model
-from django.test import TestCase
-from rest_framework.test import APIClient
-
-
 class CSRFEnforcementTests(TestCase):
-    #class that proves the unsafe endpoints still reject requests that arrive without
-    #the csrf token, django test client skips csrf checks by default so this is turned
-    #back on explicitly here
+    # class that proves the unsafe endpoints still reject requests that arrive without
+    # the csrf token, django test client skips csrf checks by default so this is turned
+    # back on explicitly here
     def setUp(self):
         self.client = APIClient(enforce_csrf_checks=True)
         self.staff = get_user_model().objects.create_user(
@@ -97,9 +98,12 @@ class CSRFEnforcementTests(TestCase):
         )
 
         from django.contrib.auth.models import Permission
-        self.staff.user_permissions.add(Permission.objects.get(
-            content_type__app_label="students", codename="view_student"
-        ))
+
+        self.staff.user_permissions.add(
+            Permission.objects.get(
+                content_type__app_label="students", codename="view_student"
+            )
+        )
 
     def test_logout_without_csrf_token_is_rejected(self):
         self.client.force_login(self.staff)
@@ -124,14 +128,15 @@ class CSRFEnforcementTests(TestCase):
         response = self.client.post(
             "/api/auth/login/",
             {"username": "example-staff", "password": "synthetic-test-password"},
-            format="json", HTTP_X_CSRFTOKEN=token,
+            format="json",
+            HTTP_X_CSRFTOKEN=token,
         )
         self.assertEqual(response.status_code, 200)
 
 
 class AuthEndpointTests(TestCase):
-    #class covering the JSON login, logout, current user, and csrf endpoints that the
-    #React client needs before it can read any staff data
+    # class covering the JSON login, logout, current user, and csrf endpoints that the
+    # React client needs before it can read any staff data
     def setUp(self):
         self.client = APIClient()
         self.staff = get_user_model().objects.create_user(
@@ -144,7 +149,7 @@ class AuthEndpointTests(TestCase):
             password="synthetic-test-password",
         )
 
-    #method that signs a staff member in through the JSON endpoint
+    # method that signs a staff member in through the JSON endpoint
     def _login(self):
         return self.client.post(
             "/api/auth/login/",
@@ -212,3 +217,231 @@ class AuthEndpointTests(TestCase):
         self._login()
         self.assertEqual(self.client.post("/api/auth/logout/").status_code, 204)
         self.assertEqual(self.client.get("/api/auth/me/").status_code, 403)
+
+
+@override_settings(CURRENT_ACADEMIC_SESSION="2026/2027")
+class AdviserMessageSendingTests(TestCase):
+    def setUp(self):
+        self.adviser = User.objects.create_user(
+            username="sending-adviser",
+            is_staff=True,
+        )
+        permission = Permission.objects.get(
+            content_type__app_label="accounts",
+            codename="send_adviser_message",
+        )
+        self.adviser.user_permissions.add(permission)
+
+        self.assignment = AdviserAssignment.objects.create(
+            staff=self.adviser,
+            academic_session="2026/2027",
+            level=300,
+        )
+        self.student = Student.objects.create(
+            identifier_type="matriculation",
+            identifier_value="MESSAGE-001",
+            full_name="Example Recipient",
+            phone_number="+2340000000000",
+            admission_year=2024,
+            mode_of_admission="utme",
+            current_level=300,
+        )
+
+    def test_sending_without_permission_is_rejected(self):
+        self.adviser.user_permissions.clear()
+
+        # Reload the account to avoid cached permission results.
+        adviser = User.objects.get(pk=self.adviser.pk)
+
+        with self.assertRaises(PermissionDenied):
+            send_adviser_message(
+                user=adviser,
+                validated_data={
+                    "assignment_id": self.assignment.pk,
+                    "audience": AdviserMessage.Audience.INDIVIDUAL,
+                    "recipient_id": self.student.pk,
+                    "subject": "Meeting",
+                    "body": "Please attend.",
+                },
+            )
+
+        self.assertEqual(AdviserMessage.objects.count(), 0)
+
+    def test_individual_message_outside_assigned_level_is_rejected(self):
+        self.student.current_level = 400
+        self.student.save(update_fields=["current_level"])
+
+        with self.assertRaises(APIValidationError):
+            send_adviser_message(
+                user=self.adviser,
+                validated_data={
+                    "assignment_id": self.assignment.pk,
+                    "audience": AdviserMessage.Audience.INDIVIDUAL,
+                    "recipient_id": self.student.pk,
+                    "subject": "Individual meeting",
+                    "body": "Please attend.",
+                },
+            )
+
+        self.assertEqual(AdviserMessage.objects.count(), 0)
+
+    def test_another_advisers_assignment_is_rejected(self):
+        other_adviser = User.objects.create_user(
+            username="other-adviser",
+            is_staff=True,
+        )
+        other_assignment = AdviserAssignment.objects.create(
+            staff=other_adviser,
+            academic_session="2026/2027",
+            level=300,
+        )
+
+        with self.assertRaises(PermissionDenied):
+            send_adviser_message(
+                user=self.adviser,
+                validated_data={
+                    "assignment_id": other_assignment.pk,
+                    "audience": AdviserMessage.Audience.INDIVIDUAL,
+                    "recipient_id": self.student.pk,
+                    "subject": "Meeting",
+                    "body": "Please attend.",
+                },
+            )
+
+        self.assertEqual(AdviserMessage.objects.count(), 0)
+
+    def test_send_individual_message(self):
+        message = send_adviser_message(
+            user=self.adviser,
+            validated_data={
+                "assignment_id": self.assignment.pk,
+                "audience": AdviserMessage.Audience.INDIVIDUAL,
+                "recipient_id": self.student.pk,
+                "subject": "Advising meeting",
+                "body": "Please attend the scheduled meeting.",
+            },
+        )
+
+        message.refresh_from_db()
+        self.assertEqual(message.assignment, self.assignment)
+        self.assertEqual(message.subject, "Advising meeting")
+        self.assertEqual(message.recipients.count(), 1)
+        self.assertTrue(message.recipients.filter(pk=self.student.pk).exists())
+
+    def test_level_announcement_reaches_only_active_assigned_students(self):
+        def create_student(identifier, level=300, is_active=True):
+            return Student.objects.create(
+                identifier_type="matriculation",
+                identifier_value=identifier,
+                full_name=f"Student {identifier}",
+                phone_number="+2340000000000",
+                admission_year=2024,
+                mode_of_admission="utme",
+                current_level=level,
+                is_active=is_active,
+            )
+
+        second = create_student("MESSAGE-002")
+        create_student("OTHER-LEVEL", level=400)
+        create_student("INACTIVE", is_active=False)
+
+        message = send_adviser_message(
+            user=self.adviser,
+            validated_data={
+                "assignment_id": self.assignment.pk,
+                "audience": AdviserMessage.Audience.LEVEL,
+                "subject": "Level meeting",
+                "body": "Please attend the level meeting.",
+            },
+        )
+
+        self.assertSetEqual(
+            set(message.recipients.values_list("pk", flat=True)),
+            {self.student.pk, second.pk},
+        )
+
+    def test_revoked_and_previous_session_assignments_are_rejected(self):
+        cases = [
+            {"is_active": False, "academic_session": "2026/2027"},
+            {"is_active": True, "academic_session": "2025/2026"},
+        ]
+
+        for changes in cases:
+            with self.subTest(**changes):
+                AdviserAssignment.objects.filter(pk=self.assignment.pk).update(
+                    **changes
+                )
+
+                with self.assertRaises(PermissionDenied):
+                    send_adviser_message(
+                        user=self.adviser,
+                        validated_data={
+                            "assignment_id": self.assignment.pk,
+                            "audience": AdviserMessage.Audience.LEVEL,
+                            "subject": "Level meeting",
+                            "body": "Please attend.",
+                        },
+                    )
+
+                self.assertEqual(AdviserMessage.objects.count(), 0)
+
+    def test_api_sends_individual_message(self):
+        client = APIClient()
+        client.force_authenticate(self.adviser)
+
+        response = client.post(
+            "/api/adviser-messages/",
+            {
+                "assignment_id": self.assignment.pk,
+                "audience": "individual",
+                "recipient_id": str(self.student.pk),
+                "subject": "Advising meeting",
+                "body": "Please attend the scheduled meeting.",
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(response.data["recipient_count"], 1)
+
+        message = AdviserMessage.objects.get(pk=response.data["message_id"])
+        self.assertEqual(message.assignment, self.assignment)
+        self.assertEqual(
+            message.body,
+            "Please attend the scheduled meeting.",
+        )
+        self.assertSetEqual(
+            set(message.recipients.values_list("pk", flat=True)),
+            {self.student.pk},
+        )
+
+    def test_session_sending_requires_csrf_token(self):
+        client = APIClient(enforce_csrf_checks=True)
+        client.force_login(self.adviser)
+
+        payload = {
+            "assignment_id": self.assignment.pk,
+            "audience": "individual",
+            "recipient_id": str(self.student.pk),
+            "subject": "Advising meeting",
+            "body": "Please attend.",
+        }
+
+        response = client.post(
+            "/api/adviser-messages/",
+            payload,
+            format="json",
+        )
+        self.assertEqual(response.status_code, 403)
+        self.assertEqual(AdviserMessage.objects.count(), 0)
+
+        token = client.get("/api/auth/csrf/").data["csrfToken"]
+
+        response = client.post(
+            "/api/adviser-messages/",
+            payload,
+            format="json",
+            HTTP_X_CSRFTOKEN=token,
+        )
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(AdviserMessage.objects.count(), 1)
