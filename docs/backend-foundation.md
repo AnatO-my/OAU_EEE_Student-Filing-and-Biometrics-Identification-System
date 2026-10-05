@@ -114,3 +114,24 @@ Set CURRENT_ACADEMIC_SESSION in the environment. It defaults to empty, which den
 AdviserMessage stores audience (individual/level), assignment, subject/body, timestamp, and explicit recipients. Recipient links survive level changes. Sending, recipient selection, permissions, read endpoints, receipts, and message administration are not implemented. Both individual messages and level announcements are required. Do not treat the model alone as a secure sending workflow.
 
 Local development/shared PostgreSQL setup is still paused. Migrations are applied only to isolated test databases in validation. Before connecting to the teammate's database, reconcile schema/account/identifier differences; do not apply our migrations to their existing schema blindly.
+
+## Reconciliation checkpoint: 5 October 2026
+
+The canonical command is now `python manage.py ...` from the repository root. It adds app/ to the import path before loading config.settings; the old app/manage.py delegates to it. Active configuration is app/config/, with accounts.User, students and accounts. Imported portal/config source is preserved under legacy/teammate_portal/ and excluded from the active runtime, migration graph and package discovery. It is reference material for academic integration, not a second deployed backend. CI now runs root management commands. WSGI/ASGI deployments must put app/ on their Python import path (for example gunicorn --chdir app config.wsgi).
+
+Student-auth work from origin/feat/student-auth is integrated: active staff and accounts linked to Student may sign in, inspect their own current-user identity and log out. Nonstaff accounts without a linked profile cannot sign in. CSRF protection remains explicit on login and on authenticated session writes. No surname-first-login backend was adopted.
+
+Messaging routes:
+
+- POST /api/adviser-messages/: send individual or level message using assignment_id, audience, subject, body, and recipient_id for individual messages. Requires send_adviser_message plus the caller's own active assignment in CURRENT_ACADEMIC_SESSION. Recipient links are selected/saved transactionally from active students in that level.
+- GET /api/me/messages/: linked student's adviser messages, paginated 20 per page. Account without a Student link gets 404. Read-only; excludes other recipients.
+- POST /api/hod-messages/: active staff superuser only. Audience individual requires student UUID recipient_id; level requires positive integer level; adviser requires integer adviser_id referencing active staff with a current active adviser assignment. Omit target fields for other audience types. Subject/body required. Current session is server-derived and required. No duplicate HODAssignment model is used; HOD does not need an adviser assignment. Targets are snapshotted in a separate HODMessage model with distinct student/adviser recipient relationships.
+- GET /api/me/hod-messages/: current account's received HOD messages, paginated and read-only; other recipients are never exposed. Staff see messages targeting their account; student messages resolve through the Student.user link.
+
+HOD send responses use message_id, audience, subject, recipient_count, created_at. Inbox responses use id, audience, subject, body, sender_name, created_at within the standard pagination envelope. UUIDs remain strings. Adviser message audience fields and HOD message audience fields are different contracts; adviser_id is a user integer, not a student UUID. Students moving levels retain previously addressed messages.
+
+HOD messaging explicitly targets one assigned adviser per adviser request; all-adviser broadcasts are not included. Message editing/deletion, read receipts and external notifications are not implemented. Message records are not registered for unscoped admin editing.
+
+Migration accounts/0004_hodmessage creates the new HOD message schema; accounts/0003 records adviser send permission. Development/shared database migrations have not been applied. Before running migrate, agree whether the shared database already has portal/auth tables and plan migration to accounts.User without losing records.
+
+Verification: 62 synthetic tests pass locally on isolated SQLite, system checks pass from root and compatibility entry points, and no missing migrations are reported. PostgreSQL CI must validate the uploaded repair. SQLite does not prove PostgreSQL row-lock behavior or concurrent delivery; the service uses atomic transactions/select_for_update but contention behavior is not stress-tested. React browser integration remains unverified.

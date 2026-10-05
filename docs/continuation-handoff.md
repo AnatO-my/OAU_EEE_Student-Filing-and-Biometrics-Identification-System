@@ -43,3 +43,8 @@ services.recalculate_gpa_and_cgpa uses Decimal weighted points/credit units by s
 6. Add student/guardian writes, scoped exports, audit, account recovery, and academic models/rules.
 
 Unrelated untracked docs, fonts, handbook and output artifacts were intentionally excluded from checkpoint commits. Check status before staging. Keep real secrets/data out of Git. See CONTRIBUTING.md and docs/backend-foundation.md.
+
+
+## Latest reconciliation update
+
+Read docs/backend-foundation.md, final reconciliation section, before continuing. Root manage.py is canonical; app/manage.py delegates. Teammate portal preserved in legacy/teammate_portal and not active. Student session auth integrated from student-auth branch. Adviser sending, student inbox, HOD sending (adviser/individual/level), and isolated HOD inbox are implemented with 62 local tests. HODAssignment was replaced by sender-based HODMessage; HOD needs no adviser assignment. Do not repeat the obsolete pending-work statements above for implemented endpoints. Shared database reconciliation/migration, account recovery, student/guardian writes, audit, exports and academic integration remain pending. Check current CI/PR status and Git state before changing files. No development database migration was applied.

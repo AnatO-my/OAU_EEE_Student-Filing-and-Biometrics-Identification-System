@@ -4,7 +4,7 @@ A departmental student filing system for the Electrical and Electronic Engineeri
 
 ## Project status
 
-This repository now includes a Django backend foundation: custom staff accounts, Student and Guardian models/migrations, and staff student read/search/filter endpoints with session/level adviser scope, a student own-profile endpoint, and adviser/message schemas. Dependency versions are recorded in `requirements.txt`. Local PostgreSQL setup, student login integration, message delivery, write/export endpoints, and the terminal API remain pending. Staff session login and read permissions are implemented. See [backend setup and implementation status](docs/backend-foundation.md).
+This repository now includes a Django backend foundation: custom staff accounts, Student and Guardian models/migrations, and staff student read/search/filter endpoints with session/level adviser scope, a student own-profile endpoint, and adviser/message schemas. Dependency versions are recorded in `requirements.txt`. Staff/student session login, adviser-scoped reads, adviser/HOD messaging and recipient inboxes are implemented. Shared/local PostgreSQL reconciliation, write/export endpoints, academic integration and the terminal API remain pending. See [backend setup and implementation status](docs/backend-foundation.md).
 
 The software design and delivery plan (SW-PLAN-01, version 0.1, 29 September 2026) informs this overview. Its architecture, stack, roles, assignments, schedule, and hosting choices are proposals pending review; this repository does not establish institutional approval.
 
@@ -73,7 +73,7 @@ The plan illustrates these software folders beneath `software/`; the existing sc
 
 Clone this repository and open its root in your editor. Review the scope and module boundaries before adding code.
 
-Follow [backend-foundation.md](docs/backend-foundation.md) for installation, configuration checks, isolated tests, API contracts, and pending database setup. Development settings still use SQLite; PostgreSQL remains the intended application database. The separate React frontend is maintained by the frontend developer.
+Use `python manage.py` from the repository root; `app/manage.py` remains a compatibility entry point. Imported portal code is preserved under `legacy/teammate_portal/` for later review and is not active. Follow [backend-foundation.md](docs/backend-foundation.md) for installation, configuration checks, isolated tests, API contracts, and pending database setup. Development settings still use SQLite; PostgreSQL remains the intended application database. The separate React frontend is maintained by the frontend developer.
 
 ## Data and access boundaries
 

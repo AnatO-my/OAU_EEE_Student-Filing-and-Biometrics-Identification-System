@@ -1,16 +1,23 @@
+from django.db.models import Q
+from django.shortcuts import get_object_or_404
+from rest_framework import generics
+from rest_framework.pagination import PageNumberPagination
+from students.models import Student
+from .models import AdviserMessage, HODMessage
+from .serializers import (AdviserMessageSendSerializer, StudentMessageSerializer,
+                          HODMessageSendSerializer, HODInboxSerializer)
+from .services import send_adviser_message, send_hod_message
+
 from django.contrib.auth import login, logout
 from django.middleware.csrf import get_token
 from django.utils.decorators import method_decorator
 from django.views.decorators.cache import never_cache
 from django.views.decorators.csrf import csrf_protect, ensure_csrf_cookie
-from django.shortcuts import get_object_or_404
-
 from rest_framework import permissions, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from .serializers import CurrentUserSerializer, LoginSerializer, AdviserMessageSendSerializer
-from .services import get_message_assignment, send_adviser_message
+from .serializers import CurrentUserSerializer, LoginSerializer
 
 
 #class that issues the csrf cookie and returns its value so the React client can
@@ -42,21 +49,32 @@ class LoginView(APIView):
         return Response(CurrentUserSerializer(user).data)
 
 
-#class that ends the staff session, csrf is enforced here by session authentication
+#class that ends the session for a staff member or a student, csrf is enforced here by
+#session authentication
 class LogoutView(APIView):
-    permission_classes = [permissions.IsAdminUser]
+    permission_classes = [permissions.IsAuthenticated]
 
     def post(self, request):
         logout(request)
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 
-#class that reports the current staff identity so the frontend can gate its interface
+#class that reports the current identity so the frontend can gate its interface, it only
+#ever returns the caller's own account and no staff or student data
 class CurrentUserView(APIView):
-    permission_classes = [permissions.IsAdminUser]
+    permission_classes = [permissions.IsAuthenticated]
 
     def get(self, request):
         return Response(CurrentUserSerializer(request.user).data)
+
+
+
+
+class IsHOD(permissions.BasePermission):
+    def has_permission(self, request, view):
+        user = request.user
+        return user.is_authenticated and user.is_active and user.is_staff and user.is_superuser
+
 
 class AdviserMessageSendView(APIView):
     permission_classes = [permissions.IsAdminUser]
@@ -64,43 +82,49 @@ class AdviserMessageSendView(APIView):
     def post(self, request):
         serializer = AdviserMessageSendSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
+        message = send_adviser_message(user=request.user, validated_data=serializer.validated_data)
+        return Response({
+            "message_id": message.pk, "audience": message.audience,
+            "subject": message.subject, "recipient_count": message.recipients.count(),
+            "created_at": message.created_at.isoformat(),
+        }, status=status.HTTP_201_CREATED)
 
-        message = send_adviser_message(
-            user=request.user,
-            validated_data=serializer.validated_data,
-        )
-
-        return Response(
-            {
-                "message_id": message.pk,
-                "audience": message.audience,
-                "subject": message.subject,
-                "recipient_count": message.recipients.count(),
-                "created_at": message.created_at.isoformat(),
-            },
-            status=status.HTTP_201_CREATED,
-        )
 
 class HODMessageSendView(APIView):
-    permission_classes = [permissions.AllowAny]
-    
+    permission_classes = [IsHOD]
+
     def post(self, request):
-            serializer = HODMessageSendSerializer(data=request.data)
-            serializer.is_valid(raise_exception=True)
-    
-            message = send_adviser_message(
-                user=request.user,
-                validated_data=serializer.validated_data,
-            )
-    
-            return Response(
-                {
-                    "message_id": message.pk,
-                    "audience": message.audience,
-                    "subject": message.subject,
-                    "recipient_count": message.recipients.count(),
-                    "created_at": message.created_at.isoformat(),
-                },
-                status=status.HTTP_201_CREATED,
-            )
-    
+        serializer = HODMessageSendSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        message = send_hod_message(user=request.user, validated_data=serializer.validated_data)
+        return Response({
+            "message_id": message.pk, "audience": message.audience,
+            "subject": message.subject,
+            "recipient_count": message.recipients.count() + message.adviser_recipients.count(),
+            "created_at": message.created_at.isoformat(),
+        }, status=status.HTTP_201_CREATED)
+
+
+class MessagePagination(PageNumberPagination):
+    page_size = 20
+
+
+class MyStudentMessagesView(generics.ListAPIView):
+    serializer_class = StudentMessageSerializer
+    permission_classes = [permissions.IsAuthenticated]
+    pagination_class = MessagePagination
+
+    def get_queryset(self):
+        student = get_object_or_404(Student, user=self.request.user)
+        return AdviserMessage.objects.filter(recipients=student).select_related("assignment__staff")
+
+
+class MyHODMessagesView(generics.ListAPIView):
+    serializer_class = HODInboxSerializer
+    permission_classes = [permissions.IsAuthenticated]
+    pagination_class = MessagePagination
+
+    def get_queryset(self):
+        return HODMessage.objects.filter(
+            Q(recipients__user=self.request.user) | Q(adviser_recipients=self.request.user)
+        ).select_related("sender").distinct()
