@@ -8,7 +8,7 @@ from django.core.exceptions import ValidationError
 
 
 class User(AbstractUser):
-    """Staff account with Django authentication, groups, and permissions."""
+    """Account for staff and students using Django authentication and permissions."""
 
     pass
 

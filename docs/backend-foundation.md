@@ -2,6 +2,17 @@
 
 ## Checkpoint: 4 October 2026
 
+Added the JSON authentication endpoints the React client needs before it can read any
+staff data: /api/auth/csrf/, /api/auth/login/, /api/auth/logout/, and /api/auth/me/.
+Session authentication is used; no token authentication was added. Account tests cover
+the token and cookie, login success and failure, identical rejection of non staff and
+unknown accounts, staff-only current-user access, session teardown on logout, and csrf
+enforcement on unsafe requests. No model or migration changes were needed. The React
+integration itself is still untested in a browser. See "Authentication endpoints" for
+the contract and the frontend origin setup.
+
+## Checkpoint: 4 October 2026
+
 Python 3.13, Django 5.2, Django REST Framework; exact development versions are in requirements.txt. pyproject.toml defines project metadata, Python compatibility, and packaging for the implemented Django apps; it reads dependencies from requirements.txt to avoid maintaining two dependency lists. Backend stays in app/. A separate React application will live in frontend/ when its developer creates it.
 
 Implemented: custom accounts.User extending AbstractUser and registered with UserAdmin; Student and Guardian models, serializers, migrations; staff-only student list/detail GET endpoints, search, validated filters, and pagination. No migrations have been applied to the development database as part of this checkpoint.
@@ -41,21 +52,65 @@ GPA/CGPA will be calculated from results after academic rules are agreed; they a
 
 Example: /api/students/?search=example&current_level=300&is_active=true&page=1
 
+## Authentication endpoints
+
+Session authentication is explicit and is what these endpoints use. They exist so the
+React client can start and end a staff session before it reads any staff data. A
+separate React app does not require JWT for this, and no token authentication has been
+added.
+
+- GET /api/auth/csrf/: issues the csrftoken cookie and returns {"csrfToken": ...}. Responses are not cached.
+- POST /api/auth/login/: accepts username and password, returns the staff identity, and starts the session.
+- POST /api/auth/logout/: ends the session. Returns 204.
+- GET /api/auth/me/: returns the current staff identity, used by the frontend to gate its interface.
+
+Login accepts staff accounts only. An inactive account, a non staff account, a wrong
+password, and an unknown username all return the same error so the endpoint cannot be
+used to discover which staff accounts exist. The password is never returned in a
+response.
+
+React must send the sessionid cookie and return the csrf token in the X-CSRFToken header
+on every unsafe request. The token is rotated when the session changes, so the client
+must call GET /api/auth/csrf/ before login and again after logging in. Anonymous clients can obtain a token before authentication. Login explicitly enforces CSRF; logout and authenticated writes use session authentication CSRF enforcement.
+
+Set DJANGO_CSRF_TRUSTED_ORIGINS to the frontend origin before developing against the
+React client, for example http://localhost:5173. It is read from the environment and
+defaults to empty. No cross origin package is installed yet: the React development
+server should proxy /api to Django, or django-cors-headers must be agreed and added
+before the client is served from a different origin. Do not add "*" to the trusted
+origins.
+
 ## Accounts and authorization decisions
 
 The HOD will use Django admin (/admin/) with a superuser account to create/disable staff accounts, manage details/passwords, and assign groups/permissions. Django admin is its own interface; React does not automatically display it. Staff use React to interact with the JSON API. Passwords use Django hashing and password APIs, never direct raw assignment to the password field. The HOD account has not yet been created.
 
-IMPORTANT: Current student GET views only check is_staff. Assigning Django model permissions in admin does not yet limit these API views. Fine-grained authorization must be implemented and tested before live use. Django's default view/add/change/delete model permissions are available; export will need an explicit permission when implemented. Cohort and field restrictions remain undefined.
+Student staff reads require is_staff, view_student permission, and an active level assignment in CURRENT_ACADEMIC_SESSION. Active superusers can read all students. Empty session configuration, revoked assignments, and previous-session assignments grant no ordinary staff access. Detail requests outside scope return 404. HOD-only admin screens prevent staff bypassing API scope. Guardians have no API routes yet. Export will need an explicit permission; field-level restrictions remain pending.
 
-Session authentication is explicit. A separate React app does not automatically require JWT. Login/logout/current-user JSON endpoints, CSRF bootstrap, frontend origin/proxy settings, and password-change/recovery flows are pending. React must never be the sole permission enforcement layer. Production CORS/CSRF/cookie settings depend on the chosen deployment addresses.
+Session authentication is explicit. A separate React app does not automatically require JWT. Login/logout/current-user JSON endpoints and CSRF bootstrap are implemented; see "Authentication endpoints". Frontend origin/proxy settings and password-change/recovery flows are pending. React must never be the sole permission enforcement layer. Production CORS/CSRF/cookie settings depend on the chosen deployment addresses.
 
 ## Remaining work
 
 1. Configure PostgreSQL locally and verify migrations there.
 2. Create the HOD superuser and verify staff account/group management.
-3. Enforce assigned permissions on direct API requests; add denied-access tests.
-4. Implement JSON login/logout/current-user and coordinate React integration.
+3. Extend tested read permissions/scope enforcement to future write/export/guardian endpoints.
+4. JSON login/logout/current-user and CSRF bootstrap are implemented; see
+   "Authentication endpoints". Coordinate React integration and agree the deployment
+   origins; password-change and recovery flows are still pending.
 5. Add student create/edit, guardian endpoints, audit history, and permission-controlled export.
 6. Add academic records and GPA/CGPA calculation rules later.
 
-Tests cover denied anonymous/nonstaff reads, search/filter/detail responses, invalid filters, pagination, unsupported writes, multiple guardians/deletion protection, and password hashing. They do not prove browser login, CSRF integration, or production readiness.
+Tests cover denied anonymous/nonstaff reads, search/filter/detail responses, invalid filters, pagination, unsupported writes, multiple guardians/deletion protection, and password hashing. Account tests cover the CSRF token and cookie, login success and failure, identical rejection of non staff and unknown accounts, staff-only current-user access, session teardown on logout, and that logout and other unsafe requests are refused without a CSRF token. They do not prove browser login against the React client, cross origin behaviour in the browser, or production readiness.
+
+## Checkpoint: 5 October 2026 — advisers and student profiles
+
+Custom User is shared by staff and students. Student.user is an optional one-to-one link, excluded from the general student serializer. Student accounts are nonstaff. GET /api/me/student/ retrieves only the profile linked to the authenticated account; it is read-only and returns 404 if no profile is linked. Existing JSON auth endpoints still accept staff only, so student session login integration remains pending. Endpoint tests use forced authentication and do not prove student browser login.
+
+AdviserAssignment stores staff, academic_session (YYYY/YYYY with consecutive years), level and active status; unique per staff/session/level. Model clean validates session and staff status; direct save does not invoke clean automatically. HOD-only admin screens allow creation/edit/deactivation, not deletion. Current scope uses current_level, not historical academic enrollment.
+
+Run setup_staff_groups only after migrations. It sets Student Readers to student/guardian view permissions and Student Editors to view/add/change permissions. Reruns replace permissions on these named groups but retain membership. Standard auth Group admin is controlled by Django permissions; group management should remain reserved for the HOD.
+
+Set CURRENT_ACADEMIC_SESSION in the environment. It defaults to empty, which denies ordinary staff record access. Advisers need both the action permission and a current active assignment. This policy currently gives all ordinary staff access only through adviser assignments; broader staff scopes are not implemented.
+
+AdviserMessage stores audience (individual/level), assignment, subject/body, timestamp, and explicit recipients. Recipient links survive level changes. Sending, recipient selection, permissions, read endpoints, receipts, and message administration are not implemented. Both individual messages and level announcements are required. Do not treat the model alone as a secure sending workflow.
+
+Local development/shared PostgreSQL setup is still paused. Migrations are applied only to isolated test databases in validation. Before connecting to the teammate's database, reconcile schema/account/identifier differences; do not apply our migrations to their existing schema blindly.

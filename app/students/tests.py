@@ -304,12 +304,15 @@ class StudentAPItests(TestCase):
         self.student.refresh_from_db()
         self.assertEqual(self.student.full_name, "Example Student")
 
+    #test_staff_cannot_bypass_scope_through_django_admin method tests that staff users cannot access the Django admin interface for student-related models, ensuring that access control is enforced even in the admin interface.
     def test_staff_cannot_bypass_scope_through_django_admin(self):
         self.client.force_login(self.staff)
         for url in ["/admin/students/student/", "/admin/students/guardian/", "/admin/accounts/user/", "/admin/accounts/adviserassignment/"]:
             self.assertEqual(self.client.get(url).status_code, 403)
 
     @override_settings(CURRENT_ACADEMIC_SESSION="")
+
+    # test_missing_session_does_not_grant_staff_access method tests that when the CURRENT_ACADEMIC_SESSION setting is empty, staff users do not have access to student records, ensuring that access control is dependent on the current academic session being set.
     def test_missing_session_does_not_grant_staff_access(self):
         self.client.force_authenticate(self.staff)
         self.assertEqual(self.client.get("/api/students/").data["count"], 0)

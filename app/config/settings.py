@@ -29,6 +29,15 @@ DEBUG = os.environ.get("DJANGO_DEBUG", "true").lower() == "true"
 
 ALLOWED_HOSTS = os.environ.get("DJANGO_ALLOWED_HOSTS", "localhost,127.0.0.1").split(",")
 
+# The React client is served from its own origin, so its development address must be
+# trusted for csrf. Values come from DJANGO_CSRF_TRUSTED_ORIGINS and stay empty until
+# a frontend origin is agreed; do not add "*" here.
+CSRF_TRUSTED_ORIGINS = [
+    origin.strip()
+    for origin in os.environ.get("DJANGO_CSRF_TRUSTED_ORIGINS", "").split(",")
+    if origin.strip()
+]
+
 
 # Application definition
 
