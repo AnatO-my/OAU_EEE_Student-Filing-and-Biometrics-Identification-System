@@ -39,18 +39,20 @@ class LoginView(APIView):
         return Response(CurrentUserSerializer(user).data)
 
 
-#class that ends the staff session, csrf is enforced here by session authentication
+#class that ends the session for a staff member or a student, csrf is enforced here by
+#session authentication
 class LogoutView(APIView):
-    permission_classes = [permissions.IsAdminUser]
+    permission_classes = [permissions.IsAuthenticated]
 
     def post(self, request):
         logout(request)
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 
-#class that reports the current staff identity so the frontend can gate its interface
+#class that reports the current identity so the frontend can gate its interface, it only
+#ever returns the caller's own account and no staff or student data
 class CurrentUserView(APIView):
-    permission_classes = [permissions.IsAdminUser]
+    permission_classes = [permissions.IsAuthenticated]
 
     def get(self, request):
         return Response(CurrentUserSerializer(request.user).data)

@@ -64,10 +64,17 @@ added.
 - POST /api/auth/logout/: ends the session. Returns 204.
 - GET /api/auth/me/: returns the current staff identity, used by the frontend to gate its interface.
 
-Login accepts staff accounts only. An inactive account, a non staff account, a wrong
-password, and an unknown username all return the same error so the endpoint cannot be
-used to discover which staff accounts exist. The password is never returned in a
-response.
+Login accepts staff accounts and student accounts linked to a student profile. An
+account that is neither is rejected, and an inactive account, a wrong password, and an
+unknown username all return the same error so the endpoint cannot be used to discover
+which accounts exist. The password is never returned in a response.
+
+`/api/auth/logout/` and `/api/auth/me/` accept any authenticated account, not only staff,
+so a student can end and inspect its own session. Both endpoints return only the caller's
+own account and never any staff or student data. The student list and detail endpoints
+keep their staff-only permissions, so a student session receives 403 from them and can
+only read its own linked profile through `GET /api/me/student/`. CSRF is still enforced
+on logout for a student session.
 
 React must send the sessionid cookie and return the csrf token in the X-CSRFToken header
 on every unsafe request. The token is rotated when the session changes, so the client
@@ -101,7 +108,7 @@ Session authentication is explicit. A separate React app does not automatically 
 
 Tests cover denied anonymous/nonstaff reads, search/filter/detail responses, invalid filters, pagination, unsupported writes, multiple guardians/deletion protection, and password hashing. Account tests cover the CSRF token and cookie, login success and failure, identical rejection of non staff and unknown accounts, staff-only current-user access, session teardown on logout, and that logout and other unsafe requests are refused without a CSRF token. They do not prove browser login against the React client, cross origin behaviour in the browser, or production readiness.
 
-## Checkpoint: 5 October 2026 — advisers and student profiles
+## Checkpoint: 5 October 2026 ï¿½ advisers and student profiles
 
 Custom User is shared by staff and students. Student.user is an optional one-to-one link, excluded from the general student serializer. Student accounts are nonstaff. GET /api/me/student/ retrieves only the profile linked to the authenticated account; it is read-only and returns 404 if no profile is linked. Existing JSON auth endpoints still accept staff only, so student session login integration remains pending. Endpoint tests use forced authentication and do not prove student browser login.
 
