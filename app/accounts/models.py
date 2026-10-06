@@ -84,6 +84,35 @@ class AdviserMessage(models.Model):
 
     class Meta:
         ordering = ["-created_at", "-id"]
+        permissions = [
+            ("send_adviser_message", "Can send adviser messages"),
+        ]
+
+    def __str__(self):
+        return self.subject
+
+
+
+class HODMessage(models.Model):
+    class Audience(models.TextChoices):
+        ADVISER = "adviser", "Assigned adviser"
+        INDIVIDUAL = "individual", "Individual student"
+        LEVEL = "level", "Student level"
+
+    sender = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT,
+                               related_name="sent_hod_messages")
+    audience = models.CharField(max_length=20, choices=Audience.choices)
+    academic_session = models.CharField(max_length=9)
+    level = models.PositiveSmallIntegerField(null=True, blank=True)
+    subject = models.CharField(max_length=200)
+    body = models.TextField()
+    recipients = models.ManyToManyField("students.Student", related_name="hod_messages", blank=True)
+    adviser_recipients = models.ManyToManyField(settings.AUTH_USER_MODEL,
+                                               related_name="received_hod_messages", blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-created_at", "-id"]
 
     def __str__(self):
         return self.subject

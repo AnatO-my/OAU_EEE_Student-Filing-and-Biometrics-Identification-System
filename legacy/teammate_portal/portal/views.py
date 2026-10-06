@@ -276,4 +276,3 @@ def calendar_settings(request):
         messages.success(request, "Academic calendar saved.")
         return redirect("calendar_settings")
     return render(request, "portal/calendar.html", {"form": form})
-

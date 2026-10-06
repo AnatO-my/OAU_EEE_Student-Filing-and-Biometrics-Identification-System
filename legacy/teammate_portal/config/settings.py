@@ -24,7 +24,7 @@ import dotenv
 
 dotenv.load_dotenv() # This loads variables from your .env file
 
-SECRET_KEY = os.getenv('SECRET_KEY')
+SECRET_KEY = os.environ["DJANGO_SECRET_KEY"]
 DEBUG = os.getenv('DEBUG', 'False') == 'True'
 
 

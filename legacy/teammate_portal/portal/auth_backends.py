@@ -24,4 +24,3 @@ class FirstLoginBackend(ModelBackend):
         if student and student.surname and password.strip().lower() == student.surname.strip().lower():
             return user
         return None
-

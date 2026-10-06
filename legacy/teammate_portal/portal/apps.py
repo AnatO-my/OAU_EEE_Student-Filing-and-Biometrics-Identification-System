@@ -15,4 +15,3 @@ class PortalConfig(AppConfig):
 
     def ready(self):
         post_migrate.connect(create_role_groups, sender=self)
-

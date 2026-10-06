@@ -68,3 +68,92 @@ class CurrentUserSerializer(serializers.ModelSerializer):
             "groups",
         ]
         read_only_fields = fields
+
+from .models import AdviserMessage, HODMessage
+
+class AdviserMessageSendSerializer(serializers.Serializer):
+
+    assignment_id = serializers.IntegerField(min_value=1)
+    audience = serializers.ChoiceField(
+        choices=AdviserMessage.Audience.choices,
+    )
+    subject = serializers.CharField(max_length=200)
+    body = serializers.CharField()
+    recipient_id = serializers.UUIDField(required=False)
+
+    def validate(self, attrs):
+        audience = attrs["audience"]
+        recipient_id = attrs.get("recipient_id")
+
+        if audience == AdviserMessage.Audience.INDIVIDUAL:
+            if recipient_id is None:
+                raise serializers.ValidationError(
+                    {"recipient_id": "Select a student for an individual message."}
+                )
+
+        elif recipient_id is not None:
+            raise serializers.ValidationError(
+                {
+                    "recipient_id": (
+                        "Omit this field for a level announcement. "
+                        "The backend selects the recipients."
+                    )
+                }
+            )
+
+        return attrs
+
+
+class StudentMessageSerializer(serializers.ModelSerializer):
+    sender_name = serializers.SerializerMethodField()
+
+    class Meta:
+        model = AdviserMessage
+        fields = [
+            "id",
+            "audience",
+            "subject",
+            "body",
+            "sender_name",
+            "created_at",
+        ]
+        read_only_fields = fields
+
+    def get_sender_name(self, obj):
+        sender = obj.assignment.staff
+        return sender.get_full_name() or sender.username
+
+
+
+class HODMessageSendSerializer(serializers.Serializer):
+    audience = serializers.ChoiceField(choices=HODMessage.Audience.choices)
+    subject = serializers.CharField(max_length=200)
+    body = serializers.CharField()
+    recipient_id = serializers.UUIDField(required=False)
+    adviser_id = serializers.IntegerField(min_value=1, required=False)
+    level = serializers.IntegerField(min_value=1, max_value=32767, required=False)
+
+    def validate(self, attrs):
+        target_field = {
+            HODMessage.Audience.INDIVIDUAL: "recipient_id",
+            HODMessage.Audience.ADVISER: "adviser_id",
+            HODMessage.Audience.LEVEL: "level",
+        }[attrs["audience"]]
+        if target_field not in attrs:
+            raise serializers.ValidationError({target_field: "This field is required for this audience."})
+        for field in {"recipient_id", "adviser_id", "level"} - {target_field}:
+            if field in attrs:
+                raise serializers.ValidationError({field: "Omit this field for the selected audience."})
+        return attrs
+
+
+class HODInboxSerializer(serializers.ModelSerializer):
+    sender_name = serializers.SerializerMethodField()
+
+    class Meta:
+        model = HODMessage
+        fields = ["id", "audience", "subject", "body", "sender_name", "created_at"]
+        read_only_fields = fields
+
+    def get_sender_name(self, obj):
+        return obj.sender.get_full_name() or obj.sender.username
