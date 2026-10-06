@@ -19,8 +19,6 @@ def grade_point_for(score):
 
 
 PASS_MARK = Decimal("40")
-# A score of 40 or more is a pass (anything below is an F). Change it together with
-# grade_point_for() if your school's pass mark is different.
 
 
 class Semester(models.TextChoices):
@@ -197,8 +195,8 @@ class AcademicCalendar(models.Model):
     current_semester = models.CharField(max_length=10, choices=Semester.choices,
                                         default=Semester.HARMATTAN)
     registration_open = models.BooleanField(default=False)
-    min_units = models.PositiveSmallIntegerField(default=0)      # 0 = no minimum
-    max_units = models.PositiveSmallIntegerField(default=0)      # 0 = no maximum
+    min_units = models.PositiveSmallIntegerField(default=15)      # 0 = no minimum
+    max_units = models.PositiveSmallIntegerField(default=24)      # 0 = no maximum
     warning_gpa = models.DecimalField(max_digits=3, decimal_places=2, default=Decimal("2.00"))
     watch_gpa = models.DecimalField(max_digits=3, decimal_places=2, default=Decimal("2.25"))
     # GPA or CGPA at or below warning_gpa shows a red warning; at or below watch_gpa an amber one.
