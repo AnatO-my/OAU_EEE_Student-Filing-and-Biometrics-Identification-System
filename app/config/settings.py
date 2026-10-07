@@ -38,6 +38,49 @@ CSRF_TRUSTED_ORIGINS = [
     if origin.strip()
 ]
 
+# Production transport hardening for deployments served over HTTPS. Development
+# and the test suite run over plain HTTP, so the transport flags are opt-in
+# through DJANGO_SECURE_TRANSPORT and must be enabled where TLS terminates.
+# SECURE_HSTS_SECONDS defaults to one year when transport hardening is on;
+# dial it down deliberately before enabling include_subdomains or preload, and
+# never enable them without confirming every subdomain serves HTTPS.
+_SECURE_TRANSPORT = os.environ.get("DJANGO_SECURE_TRANSPORT", "").lower() in {
+    "1",
+    "true",
+}
+SESSION_COOKIE_SECURE = _SECURE_TRANSPORT
+CSRF_COOKIE_SECURE = _SECURE_TRANSPORT
+SECURE_SSL_REDIRECT = _SECURE_TRANSPORT
+SECURE_HSTS_SECONDS = int(
+    os.environ.get("DJANGO_SECURE_HSTS_SECONDS")
+    or ("31536000" if _SECURE_TRANSPORT else "0"),
+)
+
+# Response hardening that is safe in every environment, including development.
+SECURE_CONTENT_TYPE_NOSNIFF = True
+SECURE_REFERRER_POLICY = "same-origin"
+X_FRAME_OPTIONS = "DENY"
+
+# Staff sessions must not live for Django's default two weeks: a session that
+# holds access to student records expires after twelve hours unless the
+# environment overrides it with DJANGO_SESSION_COOKIE_AGE_SECONDS.
+SESSION_COOKIE_AGE = int(
+    os.environ.get("DJANGO_SESSION_COOKIE_AGE_SECONDS") or str(12 * 60 * 60),
+)
+
+# Failed sign in attempts are counted in this cache. LocMem keeps the counters
+# inside this process, which is correct while the API runs as one process in
+# development, tests and a small single-server deployment. When several
+# processes or servers must share the counters, replace this block with a Redis
+# cache backend; the login code does not change because every read and write
+# already goes through django.core.cache.
+CACHES = {
+    "default": {
+        "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
+        "LOCATION": "oau-eee-student-api",
+    }
+}
+
 
 # Application definition
 
