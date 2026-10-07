@@ -68,6 +68,19 @@ SESSION_COOKIE_AGE = int(
     os.environ.get("DJANGO_SESSION_COOKIE_AGE_SECONDS") or str(12 * 60 * 60),
 )
 
+# Failed sign in attempts are counted in this cache. LocMem keeps the counters
+# inside this process, which is correct while the API runs as one process in
+# development, tests and a small single-server deployment. When several
+# processes or servers must share the counters, replace this block with a Redis
+# cache backend; the login code does not change because every read and write
+# already goes through django.core.cache.
+CACHES = {
+    "default": {
+        "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
+        "LOCATION": "oau-eee-student-api",
+    }
+}
+
 
 # Application definition
 

@@ -14,10 +14,17 @@ from django.utils.decorators import method_decorator
 from django.views.decorators.cache import never_cache
 from django.views.decorators.csrf import csrf_protect, ensure_csrf_cookie
 from rest_framework import permissions, status
+from rest_framework.exceptions import ValidationError
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from .serializers import CurrentUserSerializer, LoginSerializer
+from .throttling import (
+    clear_login_failures,
+    login_failure_key,
+    login_retry_after,
+    record_login_failure,
+)
 
 
 #class that issues the csrf cookie and returns its value so the React client can
@@ -33,7 +40,9 @@ class CSRFTokenView(APIView):
         return Response({"csrfToken": get_token(request)})
 
 
-#class that starts a staff session and returns the authenticated identity
+#class that starts a staff or student session and returns the authenticated identity,
+#failed attempts are counted against the client address and submitted username so
+#repeated guessing is paused with a 429 before the credentials are checked again
 @method_decorator(csrf_protect, name="dispatch")
 class LoginView(APIView):
     # Anonymous clients obtain a CSRF token from /api/auth/csrf/ before login.
@@ -41,9 +50,28 @@ class LoginView(APIView):
     permission_classes = [permissions.AllowAny]
 
     def post(self, request):
-        serializer = LoginSerializer(data=request.data, context={"request": request})
-        serializer.is_valid(raise_exception=True)
+        key = login_failure_key(
+            request.META.get("REMOTE_ADDR", ""),
+            str(request.data.get("username", "")),
+        )
+        retry_after = login_retry_after(key)
+        if retry_after:
+            return Response(
+                {"detail": "Too many failed sign in attempts. Try again later."},
+                status=status.HTTP_429_TOO_MANY_REQUESTS,
+                headers={"Retry-After": str(retry_after)},
+            )
 
+        serializer = LoginSerializer(data=request.data, context={"request": request})
+        try:
+            serializer.is_valid(raise_exception=True)
+        except ValidationError:
+            #every rejected credential counts, including unknown usernames, so
+            #the endpoint keeps answering identically while the counter fills
+            record_login_failure(key)
+            raise
+
+        clear_login_failures(key)
         user = serializer.validated_data["user"]
         login(request, user)
         return Response(CurrentUserSerializer(user).data)

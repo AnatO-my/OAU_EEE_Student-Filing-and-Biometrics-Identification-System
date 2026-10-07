@@ -170,3 +170,23 @@ Before serving over HTTPS, set DJANGO_DEBUG=false, DJANGO_SECRET_KEY,
 DJANGO_ALLOWED_HOSTS, DJANGO_CSRF_TRUSTED_ORIGINS and DJANGO_SECURE_TRANSPORT=true
 in the deployment environment. The React client still reads the csrf token from
 the JSON response of /api/auth/csrf/, not from document.cookie.
+
+## Login throttling: 7 October 2026
+
+Failed sign in attempts are counted in the Django cache against the client
+address and the submitted username. Five failures pause that pair for fifteen
+minutes with a 429 response and a Retry-After header, and a successful sign in
+clears the count. Scoping the counter to the address and username pair means
+one attacker cannot lock a colleague's account out from a different address,
+while trying many usernames from one address is still counted. Unknown
+usernames count the same way and the blocked answer is identical for right and
+wrong passwords, so throttling does not reveal which accounts exist.
+
+The cache backend is LocMem through settings.CACHES, correct while the API
+runs as a single process. Counters are per process and reset on restart; if
+the deployment runs several processes or servers, or needs counters to survive
+restarts, replace CACHES with a Redis backend. No login code changes in that
+case: every read and write already goes through django.core.cache. Note that
+REMOTE_ADDR is the client address as the server sees it, so behind a reverse
+proxy the deployment must configure the address scheme or all counts will be
+recorded against the proxy.
