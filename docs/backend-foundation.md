@@ -142,3 +142,31 @@ HOD messaging explicitly targets one assigned adviser per adviser request; all-a
 Migration accounts/0004_hodmessage creates the new HOD message schema; accounts/0003 records adviser send permission. Development/shared database migrations have not been applied. Before running migrate, agree whether the shared database already has portal/auth tables and plan migration to accounts.User without losing records.
 
 Verification: 62 synthetic tests pass locally on isolated SQLite, system checks pass from root and compatibility entry points, and no missing migrations are reported. PostgreSQL CI must validate the uploaded repair. SQLite does not prove PostgreSQL row-lock behavior or concurrent delivery; the service uses atomic transactions/select_for_update but contention behavior is not stress-tested. React browser integration remains unverified.
+
+## Security hardening: 6 October 2026
+
+Production transport hardening is opt-in. Setting DJANGO_SECURE_TRANSPORT=true
+enables secure session and CSRF cookies, HTTP to HTTPS redirection, and one year
+of HSTS; DJANGO_SECURE_HSTS_SECONDS and DJANGO_SESSION_COOKIE_AGE_SECONDS override
+those defaults. Development and the test suite run over plain HTTP and keep the
+transport flags off, so no local or CI behaviour changes when the switch is
+unset. Never enable HSTS include_subdomains or preload without confirming every
+subdomain serves HTTPS.
+
+Response hardening is always on and independent of the switch:
+SECURE_CONTENT_TYPE_NOSNIFF, a same-origin referrer policy, and deny framing.
+Staff sessions expire after twelve hours (SESSION_COOKIE_AGE) instead of
+Django's two weeks, because the session holds access to student records.
+
+`manage.py check --deploy` with DJANGO_DEBUG=false, a strong DJANGO_SECRET_KEY
+and DJANGO_SECURE_TRANSPORT=true must stay free of warnings except the two that
+are deliberately deferred: HSTS include_subdomains and preload, because the
+deployment domain and its subdomains are not confirmed yet. An automated test
+runs exactly that command and fails the suite if any other deployment warning
+appears. A second test asserts that login rotates the anonymous
+session key, which is the session fixation defence of the real login endpoint.
+
+Before serving over HTTPS, set DJANGO_DEBUG=false, DJANGO_SECRET_KEY,
+DJANGO_ALLOWED_HOSTS, DJANGO_CSRF_TRUSTED_ORIGINS and DJANGO_SECURE_TRANSPORT=true
+in the deployment environment. The React client still reads the csrf token from
+the JSON response of /api/auth/csrf/, not from document.cookie.
