@@ -86,7 +86,7 @@ DATABASES = {
         "ENGINE": "django.db.backends.postgresql",      # use PostgreSQL (not the default SQLite)
         "NAME": "results_db",                           # the database you created in pgAdmin
         "USER": "postgres",                             # the PostgreSQL user
-        "PASSWORD": "bilal",           # the password you set at install
+        "PASSWORD": os.environ.get("POSTGRES_PASSWORD", ""),  # archived config: no embedded credentials
         "HOST": "localhost",                            # database is on this same computer
         "PORT": "5432",                                 # PostgreSQL's default port
     }

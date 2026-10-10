@@ -1,6 +1,8 @@
-from django.contrib.auth import authenticate, get_user_model
 from django.core.exceptions import ObjectDoesNotExist
+from django.contrib.auth import authenticate, get_user_model
 from rest_framework import serializers
+
+from .models import AdviserMessage, HODMessage
 
 
 class LoginSerializer(serializers.Serializer):
@@ -51,8 +53,25 @@ class LoginSerializer(serializers.Serializer):
 
 
 class CurrentUserSerializer(serializers.ModelSerializer):
-    #class that reports the signed in staff member so the frontend can gate its
-    #interface, it is only ever read, the frontend never writes through it
+    permissions = serializers.SerializerMethodField()
+    adviser_levels = serializers.SerializerMethodField()
+    role = serializers.SerializerMethodField()
+
+    def get_permissions(self, user):
+        return sorted(user.get_all_permissions()) if user.is_active else []
+
+    def get_adviser_levels(self, user):
+        from django.conf import settings
+        if not settings.CURRENT_ACADEMIC_SESSION or not user.is_active or not user.is_staff:
+            return []
+        return list(user.adviser_assignments.filter(academic_session=settings.CURRENT_ACADEMIC_SESSION,
+            is_active=True).order_by("level").values_list("level", flat=True).distinct())
+
+    def get_role(self, user):
+        return "hod" if user.is_staff and user.is_superuser else "staff" if user.is_staff else "student"
+
+    # class that reports the signed in staff member so the frontend can gate its
+    # interface, it is only ever read, the frontend never writes through it
     groups = serializers.SlugRelatedField(many=True, read_only=True, slug_field="name")
 
     class Meta:
@@ -66,10 +85,12 @@ class CurrentUserSerializer(serializers.ModelSerializer):
             "is_staff",
             "is_superuser",
             "groups",
+            "permissions",
+            "adviser_levels",
+            "role",
         ]
         read_only_fields = fields
 
-from .models import AdviserMessage, HODMessage
 
 class AdviserMessageSendSerializer(serializers.Serializer):
 
@@ -124,7 +145,6 @@ class StudentMessageSerializer(serializers.ModelSerializer):
         return sender.get_full_name() or sender.username
 
 
-
 class HODMessageSendSerializer(serializers.Serializer):
     audience = serializers.ChoiceField(choices=HODMessage.Audience.choices)
     subject = serializers.CharField(max_length=200)
@@ -157,3 +177,28 @@ class HODInboxSerializer(serializers.ModelSerializer):
 
     def get_sender_name(self, obj):
         return obj.sender.get_full_name() or obj.sender.username
+
+
+class PasswordChangeSerializer(serializers.Serializer):
+    current_password = serializers.CharField(write_only=True, trim_whitespace=False)
+    new_password = serializers.CharField(write_only=True, trim_whitespace=False)
+
+
+class PasswordResetRequestSerializer(serializers.Serializer):
+    email = serializers.EmailField()
+
+
+class PasswordResetConfirmSerializer(serializers.Serializer):
+    uid = serializers.CharField()
+    token = serializers.CharField()
+    new_password = serializers.CharField(write_only=True, trim_whitespace=False)
+
+
+class StudentAccountCreateSerializer(serializers.Serializer):
+    username = serializers.CharField(max_length=150)
+    email = serializers.EmailField()
+    password = serializers.CharField(write_only=True, trim_whitespace=False)
+
+
+class StudentAccountLinkSerializer(serializers.Serializer):
+    account_id = serializers.IntegerField(min_value=1)

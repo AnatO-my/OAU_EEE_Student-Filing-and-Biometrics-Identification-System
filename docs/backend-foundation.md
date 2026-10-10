@@ -1,5 +1,19 @@
 # Staff and student API foundation
 
+## Current contract: 7 October 2026
+
+The checkpoints below preserve earlier implementation history. For current
+Graduation/HOD review, guardian/export and account lifecycle contracts, use
+[backend-lifecycle-guide.md](backend-lifecycle-guide.md) and
+[academics-api.md](academics-api.md). Root manage.py is the canonical entry point;
+app/manage.py remains compatible. Login supports active staff and linked student
+accounts; GPA/CGPA, guardian APIs, profile export and account recovery are now
+implemented. Statements below describing these as pending are historical.
+
+Guardian bulk email/WhatsApp results: see
+[guardian-result-sharing.md](guardian-result-sharing.md) for the current HOD-only
+preview/send/retry contract and deployment requirements.
+
 ## Checkpoint: 4 October 2026
 
 Added the JSON authentication endpoints the React client needs before it can read any
@@ -190,3 +204,36 @@ case: every read and write already goes through django.core.cache. Note that
 REMOTE_ADDR is the client address as the server sees it, so behind a reverse
 proxy the deployment must configure the address scheme or all counts will be
 recorded against the proxy.
+
+## Level changes — 6 October 2026
+
+Only the active HOD superuser may change current_level on an existing student, including PATCH /api/students/{UUID}/. Ordinary staff may edit other permitted fields within their current assignment; assigning them to both levels does not grant progression authority. Supplying the existing level unchanged is allowed. Initial student creation still uses the agreed assigned-level rule.
+
+POST /api/students/bulk-level-change/ accepts student_ids (1–1000 unique UUID strings), expected_level, and current_level (destination). HOD selects exact students; search filters or a whole level alone do not trigger changes. All selected records must exist and match expected_level. The transaction locks selected records, changes only current_level, and returns updated_count/current_level. Missing/stale IDs, duplicates, empty selections and invalid levels reject the entire request. Destination must differ from expected_level. No semester-start restriction or automatic progression is implemented. Normal session CSRF protection applies. Academic progression audit/history is still pending; this endpoint is not a complete academic approval workflow.
+
+
+### Academic grading versions and adviser permissions (7 October 2026)
+
+Grading scales now have a draft/edit/publish workflow, validated full score
+coverage, and immutable published versions. Offerings select a published scale;
+results preserve that reference for all later calculations and corrections.
+Migrations academics/0002 and 0003 preserve the original five-point rule for
+existing records. Result view/add/change/verify permissions are independent and
+require current adviser student scope; the HOD grants them explicitly.
+See [academics API contracts](academics-api.md) for endpoints and administration.
+These migrations have only been exercised against the isolated test database;
+no development/shared schema migration has been applied by this implementation.
+
+
+## Integrated backend checkpoint — 10 October 2026
+
+This checkpoint retains main's transport hardening, login throttling and separate
+surname field alongside academics, lifecycle, guardians and result sharing.
+Secure session/CSRF cookies apply when DEBUG is false or secure transport is enabled;
+HTTPS redirects and HSTS remain controlled by DJANGO_SECURE_TRANSPORT.
+The surname is excluded from API responses; surname-only sign-in is not implemented.
+The students/0006 merge migration preserves both existing migration histories
+without renaming the academic-status, export-permission or surname migrations.
+All 250 backend tests passed on isolated SQLite. No development or shared database
+migration was performed. PostgreSQL CI and reviewer approval remain required.
+See project-remaining-work.md and guardian-result-sharing.md for external setup.
