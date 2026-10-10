@@ -103,8 +103,8 @@ class StudentAPItests(TestCase):
             len(self.client.get("/api/students/?page=2").data["results"]), 1
         )
 
-    # test_writes_not_yet_exposed method checks that POST requests to the student API endpoint are not allowed, returning a 405 status code.
-    def test_writes_not_yet_exposed(self):
+    # test_staff_can_create_student_in_assigned_level method tests that a staff user with the appropriate permissions can successfully create a new student record in an assigned level, and verifies that the created student's details match the provided data.
+    def test_staff_can_create_student_in_assigned_level(self):
         permission = Permission.objects.get(
             content_type__app_label="students",
             codename="add_student",
@@ -116,10 +116,29 @@ class StudentAPItests(TestCase):
 
         response = self.client.post(
             "/api/students/",
-            {},
+            {
+                "identifier_type": "matriculation",
+                "identifier_value": "CREATE-001",
+                "full_name": "New Example Student",
+                "phone_number": "+2340000000000",
+                "admission_year": 2024,
+                "mode_of_admission": "utme",
+                "current_level": 300,
+                "is_active": True,
+            },
             format="json",
         )
-        self.assertEqual(response.status_code, 405)
+
+        self.assertEqual(response.status_code, 201)
+
+        student = Student.objects.get(identifier_value="CREATE-001")
+        self.assertEqual(student.current_level, 300)
+        self.assertEqual(student.full_name, "New Example Student")
+        self.assertEqual(
+            response.data["student_id"],
+            str(student.pk),
+        )
+        self.assertIsNone(student.user)
 
     # test_multiple_guardians_protect_student method tests that a student with multiple associated guardians cannot be deleted due to the PROTECT constraint on the foreign key relationship.
     def test_multiple_guardians_protect_student(self):
@@ -248,7 +267,7 @@ class StudentAPItests(TestCase):
         response = self.client.get(f"/api/students/{self.student.pk}/")
         self.assertEqual(response.status_code, 404)
 
-    # test_student_can_read_own_profile_only method tests that a student user can only access their own profile and is denied access to the list of students or other students' profiles, ensuring that students have restricted access to their own data only.
+    # test_student_can_read_own_profile_only method tests that a student user can only read their own profile and is denied access to the list of students or other students' profiles, ensuring that students cannot access data that does not belong to them.
     def test_student_can_read_own_profile_only(self):
         user = get_user_model().objects.create_user(
             username="example-student",
@@ -304,19 +323,250 @@ class StudentAPItests(TestCase):
         self.student.refresh_from_db()
         self.assertEqual(self.student.full_name, "Example Student")
 
-    #test_staff_cannot_bypass_scope_through_django_admin method tests that staff users cannot access the Django admin interface for student-related models, ensuring that access control is enforced even in the admin interface.
+    # test_staff_cannot_bypass_scope_through_django_admin method tests that staff users cannot access the Django admin interface for student-related models, ensuring that access control is enforced even in the admin interface.
     def test_staff_cannot_bypass_scope_through_django_admin(self):
         self.client.force_login(self.staff)
-        for url in ["/admin/students/student/", "/admin/students/guardian/", "/admin/accounts/user/", "/admin/accounts/adviserassignment/"]:
+        for url in [
+            "/admin/students/student/",
+            "/admin/students/guardian/",
+            "/admin/accounts/user/",
+            "/admin/accounts/adviserassignment/",
+        ]:
             self.assertEqual(self.client.get(url).status_code, 403)
 
+    # test_missing_session_does_not_grant_staff_access method tests that when the CURRENT_ACADEMIC_SESSION setting is missing or empty, staff users do not have access to student records, ensuring that access control is enforced based on the current academic session.
     @override_settings(CURRENT_ACADEMIC_SESSION="")
-
-    # test_missing_session_does_not_grant_staff_access method tests that when the CURRENT_ACADEMIC_SESSION setting is empty, staff users do not have access to student records, ensuring that access control is dependent on the current academic session being set.
     def test_missing_session_does_not_grant_staff_access(self):
         self.client.force_authenticate(self.staff)
         self.assertEqual(self.client.get("/api/students/").data["count"], 0)
-        self.assertEqual(self.client.get(f"/api/students/{self.student.pk}/").status_code, 404)
+        self.assertEqual(
+            self.client.get(f"/api/students/{self.student.pk}/").status_code, 404
+        )
+
+    # test_staff_cannot_create_student_outside_assigned_level method tests that a staff user cannot create a new student record in a level they are not assigned to, ensuring that access control is enforced when creating new student records.
+    def test_staff_cannot_create_student_outside_assigned_level(self):
+        permission = Permission.objects.get(
+            content_type__app_label="students",
+            codename="add_student",
+        )
+        self.staff.user_permissions.add(permission)
+
+        staff = get_user_model().objects.get(pk=self.staff.pk)
+        self.client.force_authenticate(staff)
+
+        response = self.client.post(
+            "/api/students/",
+            {
+                "identifier_type": "matriculation",
+                "identifier_value": "DENIED-001",
+                "full_name": "Outside Level Student",
+                "phone_number": "+2340000000000",
+                "admission_year": 2023,
+                "mode_of_admission": "utme",
+                "current_level": 400,
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 403)
+        self.assertFalse(
+            Student.objects.filter(
+                identifier_value="DENIED-001"
+            ).exists()
+        )
+
+    # test_staff_without_add_permission_cannot_create_student method tests that a staff user without the "add_student" permission cannot create a new student record, ensuring that access control is enforced based on user permissions.
+    def test_staff_without_add_permission_cannot_create_student(self):
+        self.client.force_authenticate(self.staff)
+
+        response = self.client.post(
+            "/api/students/",
+            {
+                "identifier_type": "matriculation",
+                "identifier_value": "NO-PERMISSION-001",
+                "full_name": "Example Student",
+                "phone_number": "+2340000000000",
+                "admission_year": 2024,
+                "mode_of_admission": "utme",
+                "current_level": 300,
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 403)
+        self.assertFalse(
+            Student.objects.filter(
+                identifier_value="NO-PERMISSION-001"
+            ).exists()
+        )
+
+    # test_hod_can_create_student_without_assignment method tests that a head of department can create a student record without being assigned as an adviser, ensuring that HODs have the appropriate permissions to manage student data.
+    def test_hod_can_create_student_without_assignment(self):
+        hod = get_user_model().objects.create_superuser(
+            username="creating-hod",
+            email="hod@example.com",
+            password="synthetic-test-password",
+        )
+        self.client.force_authenticate(hod)
+
+        response = self.client.post(
+            "/api/students/",
+            {
+                "identifier_type": "matriculation",
+                "identifier_value": "HOD-CREATE-001",
+                "full_name": "HOD Created Student",
+                "phone_number": "+2340000000000",
+                "admission_year": 2023,
+                "mode_of_admission": "transfer",
+                "current_level": 400,
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 201)
+        self.assertTrue(
+            Student.objects.filter(
+                identifier_value="HOD-CREATE-001",
+                current_level=400,
+            ).exists()
+        )
+        self.assertFalse(
+            AdviserAssignment.objects.filter(staff=hod).exists()
+        )
+
+    # test_duplicate_identifier_is_rejected method tests that a student record with a duplicate identifier is rejected, ensuring data integrity.
+    def test_duplicate_identifier_is_rejected(self):
+        permission = Permission.objects.get(
+            content_type__app_label="students",
+            codename="add_student",
+        )
+        self.staff.user_permissions.add(permission)
+
+        staff = get_user_model().objects.get(pk=self.staff.pk)
+        self.client.force_authenticate(staff)
+
+        original_count = Student.objects.count()
+
+        response = self.client.post(
+            "/api/students/",
+            {
+                "identifier_type": "matriculation",
+                "identifier_value": self.student.identifier_value,
+                "full_name": "Duplicate Student",
+                "phone_number": "+2340000000000",
+                "admission_year": 2024,
+                "mode_of_admission": "utme",
+                "current_level": 300,
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("identifier_value", response.data)
+        self.assertEqual(Student.objects.count(), original_count)
+
+        self.student.refresh_from_db()
+        self.assertEqual(self.student.full_name, "Example Student")
+
+    # test_session_creation_requires_csrf_token method tests that creating a student record requires a valid CSRF token, ensuring that CSRF protection is enforced for state-changing operations.
+    def test_session_creation_requires_csrf_token(self):
+        permission = Permission.objects.get(
+            content_type__app_label="students",
+            codename="add_student",
+        )
+        self.staff.user_permissions.add(permission)
+
+        client = APIClient(enforce_csrf_checks=True)
+        client.force_login(self.staff)
+
+        payload = {
+            "identifier_type": "matriculation",
+            "identifier_value": "CSRF-CREATE-001",
+            "full_name": "Example Student",
+            "phone_number": "+2340000000000",
+            "admission_year": 2024,
+            "mode_of_admission": "utme",
+            "current_level": 300,
+        }
+
+        response = client.post(
+            "/api/students/",
+            payload,
+            format="json",
+        )
+        self.assertEqual(response.status_code, 403)
+        self.assertFalse(
+            Student.objects.filter(
+                identifier_value="CSRF-CREATE-001"
+            ).exists()
+        )
+
+        token = client.get("/api/auth/csrf/").data["csrfToken"]
+
+        response = client.post(
+            "/api/students/",
+            payload,
+            format="json",
+            HTTP_X_CSRFTOKEN=token,
+        )
+        self.assertEqual(response.status_code, 201)
+
+    # test_staff_can_edit_student_in_assigned_level method tests that a staff user with the appropriate permissions can successfully edit an existing student record in an assigned level, and verifies that the updated student's details match the provided data.
+    def test_staff_can_edit_student_in_assigned_level(self):
+        permission = Permission.objects.get(
+            content_type__app_label="students",
+            codename="change_student",
+        )
+        self.staff.user_permissions.add(permission)
+
+        staff = get_user_model().objects.get(pk=self.staff.pk)
+        self.client.force_authenticate(staff)
+
+        response = self.client.patch(
+            f"/api/students/{self.student.pk}/",
+            {"phone_number": "+2348012345678"},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 200)
+
+        self.student.refresh_from_db()
+        self.assertEqual(
+            self.student.phone_number,
+            "+2348012345678",
+        )
+        self.assertEqual(self.student.full_name, "Example Student")
+        self.assertEqual(self.student.identifier_value, "00123456")
+        self.assertEqual(self.student.current_level, 300)
+
+   # test_staff_cannot_move_student_to_unassigned_level method tests that a staff user cannot change the current level of a student to a level they are not assigned to, ensuring that access control is enforced when updating student records.
+    def test_staff_cannot_move_student_to_unassigned_level(self):
+        permission = Permission.objects.get(
+            content_type__app_label="students",
+            codename="change_student",
+        )
+        self.staff.user_permissions.add(permission)
+
+        staff = get_user_model().objects.get(pk=self.staff.pk)
+        self.client.force_authenticate(staff)
+
+        response = self.client.patch(
+            f"/api/students/{self.student.pk}/",
+            {
+                "current_level": 400,
+                "phone_number": "+2348012345678",
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 403)
+
+        self.student.refresh_from_db()
+        self.assertEqual(self.student.current_level, 300)
+        self.assertEqual(
+            self.student.phone_number,
+            "+2340000000000",
+        )
 
 
 @override_settings(CURRENT_ACADEMIC_SESSION="2026/2027")

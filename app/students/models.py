@@ -5,13 +5,18 @@ from django.conf import settings
 
 
 class Student(models.Model):
-    #class for admission mode, this is used to identify how a student was admitted into the school.
+    # class for admission mode, this is used to identify how a student was admitted into the school.
     class AdmissionMode(models.TextChoices):
         UTME = "utme", "UTME"
         DIRECT_ENTRY = "direct_entry", "Direct Entry"
         TRANSFER = "transfer", "Transfer"
 
-    #class for identifier type, this is used to identify a student uniquely; utme number is only used as a backup until matriculation number is generated. Matric number is the primary identifier for a student.
+    # class for academic status, this is used to identify the current status of a student in the school.
+    class AcademicStatus(models.TextChoices):
+        UNDERGRADUATE = "undergraduate", "Undergraduate"
+        GRADUATED = "graduated", "Graduated"
+
+    # class for identifier type, this is used to identify a student uniquely; utme number is only used as a backup until matriculation number is generated. Matric number is the primary identifier for a student.
     class IdentifierType(models.TextChoices):
         MATRICULATION = "matriculation", "Matriculation number"
         UTME = "utme", "UTME number"
@@ -52,16 +57,22 @@ class Student(models.Model):
         choices=AdmissionMode.choices,
     )
     current_level = models.PositiveSmallIntegerField()
+    academic_status = models.CharField(
+        max_length=20,
+        choices=AcademicStatus.choices,
+        default=AcademicStatus.UNDERGRADUATE,
+    )
     is_active = models.BooleanField(default=True)
 
     class Meta:
         ordering = ["full_name", "student_id"]
+        permissions = [("export_student", "Can export student profiles")]
 
     def __str__(self):
         return f"{self.full_name} ({self.identifier_value})"
 
 
-#class for guardian information, a student can have multiple guardians, but a guardian can only be associated with one student.
+# class for guardian information, a student can have multiple guardians, but a guardian can only be associated with one student.
 class Guardian(models.Model):
     guardian_id = models.UUIDField(
         primary_key=True,

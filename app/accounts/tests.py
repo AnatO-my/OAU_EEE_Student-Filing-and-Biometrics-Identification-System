@@ -82,9 +82,9 @@ class AdviserMessageTests(TestCase):
 
 
 class CSRFEnforcementTests(TestCase):
-    #class that proves the unsafe endpoints still reject requests that arrive without
-    #the csrf token, django test client skips csrf checks by default so this is turned
-    #back on explicitly here
+    # class that proves the unsafe endpoints still reject requests that arrive without
+    # the csrf token, django test client skips csrf checks by default so this is turned
+    # back on explicitly here
     def setUp(self):
         self.client = APIClient(enforce_csrf_checks=True)
         self.staff = get_user_model().objects.create_user(
@@ -94,9 +94,12 @@ class CSRFEnforcementTests(TestCase):
         )
 
         from django.contrib.auth.models import Permission
-        self.staff.user_permissions.add(Permission.objects.get(
-            content_type__app_label="students", codename="view_student"
-        ))
+
+        self.staff.user_permissions.add(
+            Permission.objects.get(
+                content_type__app_label="students", codename="view_student"
+            )
+        )
 
     def test_logout_without_csrf_token_is_rejected(self):
         self.client.force_login(self.staff)
@@ -121,14 +124,15 @@ class CSRFEnforcementTests(TestCase):
         response = self.client.post(
             "/api/auth/login/",
             {"username": "example-staff", "password": "synthetic-test-password"},
-            format="json", HTTP_X_CSRFTOKEN=token,
+            format="json",
+            HTTP_X_CSRFTOKEN=token,
         )
         self.assertEqual(response.status_code, 200)
 
 
 class AuthEndpointTests(TestCase):
-    #class covering the JSON login, logout, current user, and csrf endpoints that the
-    #React client needs before it can read any staff data
+    # class covering the JSON login, logout, current user, and csrf endpoints that the
+    # React client needs before it can read any staff data
     def setUp(self):
         self.client = APIClient()
         self.staff = get_user_model().objects.create_user(
@@ -141,7 +145,7 @@ class AuthEndpointTests(TestCase):
             password="synthetic-test-password",
         )
 
-    #method that signs a staff member in through the JSON endpoint
+    # method that signs a staff member in through the JSON endpoint
     def _login(self):
         return self.client.post(
             "/api/auth/login/",
@@ -194,8 +198,8 @@ class AuthEndpointTests(TestCase):
         self.assertIn("password", response.data)
 
     def test_current_user_requires_an_authenticated_session(self):
-        #an anonymous caller is refused, but any authenticated account may read its own
-        #identity now that students can sign in too
+        # an anonymous caller is refused, but any authenticated account may read its own
+        # identity now that students can sign in too
         self.assertEqual(self.client.get("/api/auth/me/").status_code, 403)
         self.client.force_authenticate(self.nonstaff)
         response = self.client.get("/api/auth/me/")
@@ -215,10 +219,12 @@ class AuthEndpointTests(TestCase):
         self._login()
         self.assertEqual(self.client.post("/api/auth/logout/").status_code, 204)
         self.assertEqual(self.client.get("/api/auth/me/").status_code, 403)
+
+
 class StudentLoginTests(TestCase):
-    #class covering student sign in and the session it receives, it uses the real csrf
-    #and session endpoints rather than forced authentication so the whole browser flow
-    #is exercised
+    # class covering student sign in and the session it receives, it uses the real csrf
+    # and session endpoints rather than forced authentication so the whole browser flow
+    # is exercised
     def setUp(self):
         self.client = APIClient()
         self.student_user = User.objects.create_user(
@@ -245,8 +251,8 @@ class StudentLoginTests(TestCase):
             password="synthetic-test-password",
         )
 
-    #method that signs an account in through the real endpoint, obtaining the csrf token
-    #first because login enforces it, and returning the refreshed token afterwards
+    # method that signs an account in through the real endpoint, obtaining the csrf token
+    # first because login enforces it, and returning the refreshed token afterwards
     def _sign_in(self, username):
         token = self.client.get("/api/auth/csrf/").data["csrfToken"]
         response = self.client.post(
@@ -257,7 +263,7 @@ class StudentLoginTests(TestCase):
         )
         return response, self.client.get("/api/auth/csrf/").data["csrfToken"]
 
-    #method that signs an account in and returns only the response
+    # method that signs an account in and returns only the response
     def _login(self, username):
         return self._sign_in(username)[0]
 
@@ -329,8 +335,8 @@ class StudentLoginTests(TestCase):
         self.assertEqual(self.client.get("/api/me/student/").status_code, 403)
 
     def test_student_logout_without_csrf_token_is_rejected(self):
-        #csrf checks are off by default on the test client, so a separate enforcing
-        #client is used to prove logout is still protected for a student session
+        # csrf checks are off by default on the test client, so a separate enforcing
+        # client is used to prove logout is still protected for a student session
         enforcing = APIClient(enforce_csrf_checks=True)
         token = enforcing.get("/api/auth/csrf/").data["csrfToken"]
         enforcing.post(
@@ -348,6 +354,8 @@ from django.test import override_settings
 from rest_framework.exceptions import ValidationError as APIValidationError
 from .models import User, AdviserMessage, AdviserAssignment
 from .services import send_adviser_message
+
+
 @override_settings(CURRENT_ACADEMIC_SESSION="2026/2027")
 class AdviserMessageSendingTests(TestCase):
     def setUp(self):
