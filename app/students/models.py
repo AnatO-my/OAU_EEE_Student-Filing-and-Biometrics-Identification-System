@@ -37,6 +37,14 @@ class Student(models.Model):
         unique=True,
     )
     full_name = models.CharField(max_length=200)
+    surname = models.CharField(max_length=100, blank=True, default="")
+    # The student's surname, stored on its own because it doubles as the
+    # student's first-login credential and must never be guessed by parsing
+    # full_name; the order of tokens in a full name is not reliable. It is
+    # filled in when staff create the account or import the departmental
+    # list, and a student with an empty surname cannot use surname login
+    # until an administrator sets it. It is deliberately not part of the
+    # student API responses while it is still an initial credential.
     phone_number = models.CharField(max_length=30, blank=False)
     admission_year = models.PositiveSmallIntegerField()
     mode_of_admission = models.CharField(

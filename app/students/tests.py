@@ -317,3 +317,64 @@ class StudentAPItests(TestCase):
         self.client.force_authenticate(self.staff)
         self.assertEqual(self.client.get("/api/students/").data["count"], 0)
         self.assertEqual(self.client.get(f"/api/students/{self.student.pk}/").status_code, 404)
+
+
+@override_settings(CURRENT_ACADEMIC_SESSION="2026/2027")
+class StudentSurnameFieldTests(TestCase):
+    #the surname is stored on its own because it doubles as the student's
+    #first-login credential; these tests pin the field's behaviour before the
+    #account creation and surname login flow is built on top of it
+
+    def setUp(self):
+        self.client = APIClient()
+        self.staff = get_user_model().objects.create_user(
+            username="example-staff-surname",
+            is_staff=True,
+        )
+        self.student = Student.objects.create(
+            identifier_type="matriculation",
+            identifier_value="TEST-SURNAME-001",
+            full_name="Example Ogunlade",
+            surname="Ogunlade",
+            phone_number="+2340000000001",
+            admission_year=2024,
+            mode_of_admission="utme",
+            current_level=300,
+        )
+        AdviserAssignment.objects.create(
+            staff=self.staff,
+            academic_session="2026/2027",
+            level=300,
+        )
+        permission = Permission.objects.get(codename="view_student")
+        self.staff.user_permissions.add(permission)
+
+    #the surname is kept exactly as typed, independent of the full name
+    def test_surname_is_stored_separately_from_full_name(self):
+        self.assertEqual(self.student.surname, "Ogunlade")
+        self.assertEqual(self.student.full_name, "Example Ogunlade")
+
+    #a student created without a surname keeps an empty value rather than a
+    #token guessed from the full name, so surname login simply stays
+    #unavailable until an administrator sets it
+    def test_missing_surname_defaults_to_empty_and_is_not_guessed(self):
+        student = Student.objects.create(
+            identifier_type="matriculation",
+            identifier_value="TEST-SURNAME-002",
+            full_name="Adaeze Nwosu",
+            phone_number="+2340000000002",
+            admission_year=2024,
+            mode_of_admission="utme",
+            current_level=300,
+        )
+        self.assertEqual(student.surname, "")
+
+    #while the surname doubles as the initial credential it must never appear
+    #in staff api responses, otherwise any staff member who can read students
+    #could impersonate a student before the forced password change
+    def test_student_api_responses_do_not_expose_the_surname(self):
+        self.client.force_authenticate(self.staff)
+        list_response = self.client.get("/api/students/")
+        detail_response = self.client.get(f"/api/students/{self.student.pk}/")
+        self.assertNotIn("surname", list_response.data["results"][0])
+        self.assertNotIn("surname", detail_response.data)
