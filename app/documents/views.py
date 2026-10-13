@@ -6,18 +6,23 @@ from rest_framework.parsers import MultiPartParser
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from students.models import Student
+from django.conf import settings
 
 from .models import StudentDocument
 from .serializers import DocumentUploadSerializer, StudentDocumentSerializer
+from students.permissions import StudentModelPermissions
+from students.services import students_visible_to
 
 
 class StudentDocumentView(APIView):
-    permission_classes = [permissions.IsAdminUser]
+    permission_classes = [permissions.IsAdminUser, StudentModelPermissions]
     parser_classes = [MultiPartParser]
+    queryset =  StudentDocument.objects.none()
 
     def post(self, request, student_id):
-        student = get_object_or_404(Student, student_id=student_id)
+        student = get_object_or_404(
+            students_visible_to(request.user, settings.CURRENT_ACADEMIC_SESSION), 
+            student_id=student_id)
 
         form = DocumentUploadSerializer(data=request.data)
         form.is_valid(raise_exception=True)
