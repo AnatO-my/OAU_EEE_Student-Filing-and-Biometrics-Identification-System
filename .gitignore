@@ -28,6 +28,7 @@ file_system/
 media/
 staticfiles/
 uploads/
+private_media/
 exports/
 backups/
 *.log

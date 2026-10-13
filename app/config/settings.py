@@ -94,6 +94,7 @@ INSTALLED_APPS = [
     "rest_framework",
     "students.apps.StudentsConfig",
     "accounts.apps.AccountsConfig",
+    "documents.apps.DocumentsConfig",
 ]
 
 MIDDLEWARE = [
@@ -195,4 +196,8 @@ REST_FRAMEWORK = {
 CURRENT_ACADEMIC_SESSION = os.environ.get(
     "CURRENT_ACADEMIC_SESSION",
     "",
+)
+# Uploaded documents are private: stored outside any publicly served folder.
+PRIVATE_MEDIA_ROOT = os.environ.get(
+    "PRIVATE_MEDIA_ROOT", str(BASE_DIR / "private_media")
 )
