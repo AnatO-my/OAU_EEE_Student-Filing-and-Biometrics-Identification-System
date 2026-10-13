@@ -15,8 +15,8 @@ def document_upload_path(instance, filename):
     # like "../../x.pdf" then cannot choose where the file lands.
     return f"documents/{instance.student_id}/{uuid.uuid4().hex}.pdf"
 
-class StudentsDocument(models.Model):
-    class DpcumentType(models.TextChoices):
+class StudentDocument(models.Model):
+    class DocumentType(models.TextChoices):
         RESULT = "result", "Result"
         OTHER = "other", "other"
 
@@ -32,8 +32,8 @@ class StudentsDocument(models.Model):
     )
     document_type = models.CharField(
         max_length=20,
-        choices=DpcumentType.choices,
-        default=DpcumentType.RESULT,
+        choices=DocumentType.choices,
+        default=DocumentType.RESULT,
     )
     file = models.FileField(
         upload_to=document_upload_path,

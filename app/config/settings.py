@@ -201,3 +201,4 @@ CURRENT_ACADEMIC_SESSION = os.environ.get(
 PRIVATE_MEDIA_ROOT = os.environ.get(
     "PRIVATE_MEDIA_ROOT", str(BASE_DIR / "private_media")
 )
+DOCUMENT_MAX_UPLOAD_BYTES = 10 * 1024 * 1024  # proposed limit: 10 MB
