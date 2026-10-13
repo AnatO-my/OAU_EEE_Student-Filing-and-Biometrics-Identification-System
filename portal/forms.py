@@ -3,14 +3,15 @@ from datetime import date
 from django import forms
 from django.contrib.auth import get_user_model
 from django.contrib.auth.forms import AuthenticationForm
+from django.conf import settings
 
-from .models import AcademicCalendar, Course, Result, Student
+from .models import AcademicCalendar, Course, Result, Student, StudentFile
 
 
 def session_choices():
-    """2027/2028 down to 8 years back. Built when a form is shown so it never goes stale."""
+    """2027/2028 down to 10 years back. Built when a form is shown so it never goes stale."""
     year = date.today().year
-    return [(f"{y}/{y + 1}", f"{y}/{y + 1}") for y in range(year + 1, year - 9, -1)]
+    return [(f"{y}/{y + 1}", f"{y}/{y + 1}") for y in range(year + 1, year - 11, -1)]
 
 
 def check_upload_file(f):
@@ -63,6 +64,7 @@ class DataUploadForm(forms.Form):
         choices=[
             ("courses", "Courses"),
             ("students", "Students (also creates their logins)"),
+            ("matrics", "Matric Numbers"),
             ("results", "Results, full format (file has course_code, session and semester columns)"),
             ("guardians", "Guardians"),
             ("files", "Student files (cloud links)"),
@@ -133,3 +135,18 @@ class CalendarForm(forms.ModelForm):
         if low and high and low > high:
             raise forms.ValidationError("The minimum units cannot be more than the maximum units.")
         return data
+
+class StudentFileUploadForm(forms.ModelForm):
+    class Meta:
+        model = StudentFile
+        fields = ['file_type', 'cloud_url'] # Or your file field
+
+    file = forms.FileField()
+
+    def clean_file(self):
+        uploaded_file = self.cleaned_data.get('file')
+        if uploaded_file:
+            # Check size against the 5MB limit
+            if uploaded_file.size > settings.MAX_STUDENT_FILE_SIZE:
+                raise forms.ValidationError("File size exceeds the 5MB limit per student.")
+        return uploaded_file

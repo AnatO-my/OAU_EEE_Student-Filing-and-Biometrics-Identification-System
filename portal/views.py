@@ -7,6 +7,8 @@ from django.db.models import Q
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse_lazy
 from django.views.decorators.http import require_POST
+from django.shortcuts import redirect, render
+
 
 from .forms import (
     CalendarForm,
@@ -16,7 +18,7 @@ from .forms import (
     ResultsUploadForm,
     StudentSearchForm,
 )
-from .models import AcademicCalendar, Result, Student
+from .models import AcademicCalendar, Result, Student, StudentFile
 from .registration import registration_options, save_registration
 from .reports import student_overview
 from .roles import is_hod, is_lecturer, is_student, role_required
@@ -26,6 +28,7 @@ from .services import (
     import_courses,
     import_files,
     import_guardians,
+    import_matric_numbers,  # <-- Add this here
     import_results,
     import_students,
     read_upload,
@@ -114,6 +117,7 @@ def upload_results(request):
 DATA_IMPORTERS = {
     "courses": (import_courses, "course(s)"),
     "students": (import_students, "student(s)"),
+    "matrics": (import_matric_numbers, "matric number(s)"),
     "results": (import_results, "result(s)"),
     "guardians": (import_guardians, "new guardian(s)"),
     "files": (import_files, "new file link(s)"),
@@ -140,7 +144,25 @@ def upload_data(request):
                 form = DataUploadForm(initial={"kind": kind})
     return render(request, "portal/upload_data.html", {"form": form, "errors": errors})
 
+@role_required(is_hod)
+def upload_matric(request):
+    errors = []
+    if request.method == "POST":
+        # Using your existing DataUploadForm or a generic file request check
+        file_obj = request.FILES.get("file")
+        if not file_obj:
+            errors.append("Please select a file to upload.")
+        else:
+            try:
+                df = read_upload(file_obj)
+                saved, errors = import_matric_numbers(df)
+                if not errors:
+                    messages.success(request, f"Successfully assigned matric numbers to {saved} student(s). Logins updated.")
+                    return redirect("upload_matric")
+            except Exception:
+                errors = ["Could not read the file. Check that it is a valid CSV or Excel file."]
 
+    return render(request, "portal/upload_matric.html", {"errors": errors})
 # ---------------- searching (lecturers and HOD) ----------------
 
 def _paginate(request, queryset, per_page=50):
@@ -277,3 +299,34 @@ def calendar_settings(request):
         return redirect("calendar_settings")
     return render(request, "portal/calendar.html", {"form": form})
 
+@login_required
+def upload_student_file(request):
+    student = Student.objects.filter(user=request.user).first()
+    
+    if request.method == "POST":
+        file_obj = request.FILES.get("file")
+        file_type = request.POST.get("file_type", "document")
+
+        if not file_obj:
+            messages.error(request, "Please select a file to upload.")
+            return redirect("upload_student_file")
+
+        # Check 5MB limit programmatically
+        if file_obj.size > 5 * 1024 * 1024:
+            messages.error(request, "File is too large! Maximum allowed size is 5MB.")
+            return redirect("upload_student_file")
+
+        try:
+            # Saving the file automatically pushes it to your Neon Object Storage bucket
+            student_file = StudentFile(
+                student=student,
+                file_type=file_type,
+                cloud_url=file_obj  # django-storages uploads this and stores the storage URL string
+            )
+            student_file.save()
+            messages.success(request, "File uploaded successfully to your cloud storage!")
+            return redirect("my_record")
+        except Exception as e:
+            messages.error(request, f"Upload failed: {e}")
+
+    return render(request, "portal/upload_file.html")

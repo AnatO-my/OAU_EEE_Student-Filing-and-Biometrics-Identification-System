@@ -21,6 +21,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 
 import os
 import dotenv
+import dj_database_url
 
 dotenv.load_dotenv() # This loads variables from your .env file
 
@@ -82,15 +83,35 @@ WSGI_APPLICATION = 'config.wsgi.application'
 # https://docs.djangoproject.com/en/6.1/ref/settings/#databases
 
 DATABASES = {
-    "default": {                                        # "default" = the main database
-        "ENGINE": "django.db.backends.postgresql",      # use PostgreSQL (not the default SQLite)
-        "NAME": "results_db",                           # the database you created in pgAdmin
-        "USER": "postgres",                             # the PostgreSQL user
-        "PASSWORD": "bilal",           # the password you set at install
-        "HOST": "localhost",                            # database is on this same computer
-        "PORT": "5432",                                 # PostgreSQL's default port
-    }
+    "default": dj_database_url.config(
+        default=os.getenv("DATABASE_URL"),
+        conn_max_age=600,
+        ssl_require=True,
+    )
 }
+
+import os
+
+# --- Neon S3 Object Storage Configuration ---
+STORAGES = {
+    "default": {
+        "BACKEND": "storages.backends.s3.S3Storage",
+    },
+    "staticfiles": {
+        "BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage",
+    },
+}
+
+AWS_S3_ENDPOINT_URL = os.getenv("NEON_STORAGE_ENDPOINT")
+AWS_ACCESS_KEY_ID = os.getenv("NEON_STORAGE_ACCESS_KEY_ID")
+AWS_SECRET_ACCESS_KEY = os.getenv("NEON_STORAGE_SECRET_ACCESS_KEY")
+AWS_STORAGE_BUCKET_NAME = os.getenv("NEON_STORAGE_BUCKET_NAME")
+AWS_DEFAULT_ACL = None
+AWS_QUERYSTRING_AUTH = True  # Generates secure temporary download URLs
+
+# Maximum file upload size limit (5 Megabytes in bytes)
+MAX_STUDENT_FILE_SIZE = 5 * 1024 * 1024  # 5,242,880 bytes
+
 
 
 # Password validation

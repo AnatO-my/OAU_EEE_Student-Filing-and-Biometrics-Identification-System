@@ -1,25 +1,32 @@
 from functools import wraps
-
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import PermissionDenied
-
 from .models import Student
-# Three roles:
-#   HOD       group "HOD"        -> everything, including bulk data uploads and emailing parents
-#   Lecturer  group "Lecturers"  -> upload results, search and view students' results
-#   Student   has a Student record linked to their login -> sees only their own record
-
 
 def is_hod(user):
     return user.is_authenticated and (
         user.is_superuser or user.groups.filter(name="HOD").exists())
 
-
 def is_lecturer(user):
-    # HODs can do everything lecturers can.
     return user.is_authenticated and (
         user.is_superuser or user.groups.filter(name__in=["Lecturers", "HOD"]).exists())
 
+def is_part_adviser(user):
+    """Checks if the user belongs to any Part Adviser group."""
+    return user.is_authenticated and (
+        user.is_superuser or user.groups.filter(name__startswith="PartAdviser_").exists())
+
+def get_adviser_level(user):
+    """Extracts the specific level integer the user is advising (e.g., 100 from 'PartAdviser_100')."""
+    if user.is_superuser or user.groups.filter(name="HOD").exists():
+        return None  # HOD sees all levels
+    group = user.groups.filter(name__startswith="PartAdviser_").first()
+    if group:
+        try:
+            return int(group.name.split("_")[1])
+        except (IndexError, ValueError):
+            return None
+    return None
 
 def is_student(user):
     return user.is_authenticated and Student.objects.filter(user=user).exists()

@@ -642,3 +642,35 @@ def import_course_results(df, course, session, semester):
         )
         recalculate_gpa_and_cgpa({o.student_id for o in objs})
     return len(objs), []
+
+import pandas as pd
+from .models import Student
+
+def import_matric_numbers(df):
+    """Reads a DataFrame with 'jamb_reg' and 'new_matric' and updates student records."""
+    updated_count = 0
+    missing_count = 0
+    errors = []
+
+    for _, row in df.iterrows():
+        jamb_reg = str(row.get('jamb_reg', '')).strip()
+        new_matric = str(row.get('new_matric', '')).strip()
+
+        if not jamb_reg or not new_matric or jamb_reg.lower() == 'nan':
+            continue
+
+        student = Student.objects.filter(jamb_reg_number=jamb_reg).first()
+        if student:
+            try:
+                student.matric_number = new_matric
+                student.save()  # Triggers the model's save() override to sync username!
+                updated_count += 1
+            except Exception as e:
+                errors.append(f"Error updating {jamb_reg} to {new_matric}: {e}")
+        else:
+            missing_count += 1
+
+    if missing_count > 0:
+        errors.append(f"{missing_count} JAMB registration number(s) from the file were not found in the database.")
+
+    return updated_count, errors
