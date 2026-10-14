@@ -94,7 +94,11 @@ INSTALLED_APPS = [
     "rest_framework",
     "students.apps.StudentsConfig",
     "accounts.apps.AccountsConfig",
+<<<<<<< HEAD
     "documents.apps.DocumentsConfig",
+=======
+    "academics.apps.AcademicsConfig",
+>>>>>>> origin/main
 ]
 
 MIDDLEWARE = [
@@ -197,6 +201,7 @@ CURRENT_ACADEMIC_SESSION = os.environ.get(
     "CURRENT_ACADEMIC_SESSION",
     "",
 )
+<<<<<<< HEAD
 # Uploaded documents are private: stored outside any publicly served folder.
 PRIVATE_MEDIA_ROOT = os.environ.get(
     "PRIVATE_MEDIA_ROOT", str(BASE_DIR / "private_media")
@@ -207,3 +212,34 @@ DOCUMENT_OCR_MIN_CONFIDENCE = 60  # percent
 DOCUMENT_OCR_MIN_CHARACTERS = 50
 # Dotted path of the OCR function; see documents/ocr.py for the contract.
 DOCUMENT_OCR_BACKEND = "documents.ocr.placeholder_extract_text"
+=======
+
+
+# React uses a same-origin /api proxy; no permissive CORS middleware is enabled.
+SESSION_COOKIE_HTTPONLY = True
+SESSION_COOKIE_SAMESITE = "Lax"
+SESSION_COOKIE_SECURE = SESSION_COOKIE_SECURE or not DEBUG
+CSRF_COOKIE_SECURE = CSRF_COOKIE_SECURE or not DEBUG
+PASSWORD_RESET_FRONTEND_URL = os.environ.get("PASSWORD_RESET_FRONTEND_URL", "")
+PASSWORD_RESET_TIMEOUT = 3600
+EMAIL_BACKEND = os.environ.get("DJANGO_EMAIL_BACKEND", "django.core.mail.backends.console.EmailBackend" if DEBUG else "django.core.mail.backends.smtp.EmailBackend")
+EMAIL_HOST = os.environ.get("DJANGO_EMAIL_HOST", "localhost")
+EMAIL_PORT = int(os.environ.get("DJANGO_EMAIL_PORT", "587"))
+EMAIL_HOST_USER = os.environ.get("DJANGO_EMAIL_HOST_USER", "")
+EMAIL_HOST_PASSWORD = os.environ.get("DJANGO_EMAIL_HOST_PASSWORD", "")
+EMAIL_USE_TLS = os.environ.get("DJANGO_EMAIL_USE_TLS", "true").lower() == "true"
+DEFAULT_FROM_EMAIL = os.environ.get("DJANGO_DEFAULT_FROM_EMAIL", "noreply@example.invalid")
+REST_FRAMEWORK["DEFAULT_THROTTLE_RATES"] = {
+    "password_reset": "20/hour", "password_reset_confirm": "60/hour",
+}
+
+
+# Bulk guardian reports stay disabled until providers are configured.
+RESULT_SHARING_ENABLED = os.environ.get("RESULT_SHARING_ENABLED", "false").lower() == "true"
+EMAIL_TIMEOUT = 20
+WHATSAPP_ACCESS_TOKEN = os.environ.get("WHATSAPP_ACCESS_TOKEN", "")
+WHATSAPP_PHONE_NUMBER_ID = os.environ.get("WHATSAPP_PHONE_NUMBER_ID", "")
+WHATSAPP_API_VERSION = os.environ.get("WHATSAPP_API_VERSION", "")
+WHATSAPP_RESULT_TEMPLATE = os.environ.get("WHATSAPP_RESULT_TEMPLATE", "")
+WHATSAPP_TEMPLATE_LANGUAGE = os.environ.get("WHATSAPP_TEMPLATE_LANGUAGE", "")
+>>>>>>> origin/main

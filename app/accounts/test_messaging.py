@@ -10,45 +10,133 @@ from .services import send_adviser_message, send_hod_message
 
 @override_settings(CURRENT_ACADEMIC_SESSION="2026/2027")
 class MessagingIntegrationTests(TestCase):
+
     def setUp(self):
         self.client = APIClient()
-        self.hod = User.objects.create_superuser("hod", "hod@example.com", "test-password")
+        self.hod = User.objects.create_superuser(
+            "hod", "hod@example.com", "test-password"
+        )
         self.adviser = User.objects.create_user("adviser", is_staff=True)
-        self.adviser.user_permissions.add(Permission.objects.get(
-            content_type__app_label="accounts", codename="send_adviser_message"))
+        self.adviser.user_permissions.add(
+            Permission.objects.get(
+                content_type__app_label="accounts", codename="send_adviser_message"
+            )
+        )
         self.assignment = AdviserAssignment.objects.create(
-            staff=self.adviser, academic_session="2026/2027", level=300)
+            staff=self.adviser, academic_session="2026/2027", level=300
+        )
         self.other_staff = User.objects.create_user("other-adviser", is_staff=True)
         AdviserAssignment.objects.create(
-            staff=self.other_staff, academic_session="2026/2027", level=400)
-        self.student_user = User.objects.create_user("student", password="student-password")
+            staff=self.other_staff, academic_session="2026/2027", level=400
+        )
+        self.student_user = User.objects.create_user(
+            "student", password="student-password"
+        )
         self.other_user = User.objects.create_user("other-student")
         self.student = self.make_student("S-001", 300, self.student_user)
         self.other_student = self.make_student("S-002", 400, self.other_user)
 
     def make_student(self, identifier, level, user=None, is_active=True):
         return Student.objects.create(
-            identifier_type="matriculation", identifier_value=identifier,
-            full_name=identifier, phone_number="+2340000000000", admission_year=2024,
-            mode_of_admission="utme", current_level=level, user=user, is_active=is_active)
+            identifier_type="matriculation",
+            identifier_value=identifier,
+            full_name=identifier,
+            phone_number="+2340000000000",
+            admission_year=2024,
+            mode_of_admission="utme",
+            current_level=level,
+            user=user,
+            is_active=is_active,
+        )
 
     def post(self, audience, **target):
-        return self.client.post("/api/hod-messages/", {
-            "audience": audience, "subject": "Meeting", "body": "Please attend.", **target,
-        }, format="json")
+        return self.client.post(
+            "/api/hod-messages/",
+            {
+                "audience": audience,
+                "subject": "Meeting",
+                "body": "Please attend.",
+                **target,
+            },
+            format="json",
+        )
+
+    def test_message_detail_is_visible_only_to_recipient(self):
+        message = send_adviser_message(
+            user=self.adviser,
+            validated_data={
+                "assignment_id": self.assignment.pk,
+                "audience": "individual",
+                "recipient_id": self.student.pk,
+                "subject": "Private advising message",
+                "body": "Please attend your advising meeting.",
+            },
+        )
+        url = f"/api/me/messages/{message.pk}/"
+
+        self.client.force_authenticate(self.student_user)
+        response = self.client.get(url)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["id"], message.pk)
+        self.assertEqual(
+            response.data["body"],
+            "Please attend your advising meeting.",
+        )
+
+        self.client.force_authenticate(self.other_user)
+        response = self.client.get(url)
+
+        self.assertEqual(response.status_code, 404)
+
+    def test_student_cannot_modify_or_delete_received_message(self):
+        message = send_adviser_message(
+            user=self.adviser,
+            validated_data={
+                "assignment_id": self.assignment.pk,
+                "audience": "individual",
+                "recipient_id": self.student.pk,
+                "subject": "Private message",
+                "body": "Original content.",
+            },
+        )
+        url = f"/api/me/messages/{message.pk}/"
+        self.client.force_authenticate(self.student_user)
+
+        response = self.client.patch(
+            url,
+            {"body": "Changed content."},
+            format="json",
+        )
+        self.assertEqual(response.status_code, 405)
+
+        response = self.client.delete(url)
+        self.assertEqual(response.status_code, 405)
+
+        message.refresh_from_db()
+        self.assertEqual(message.body, "Original content.")
 
     def test_anonymous_student_and_staff_cannot_send_hod_messages(self):
         for user in [None, self.student_user, self.adviser]:
             self.client.force_authenticate(user)
-            self.assertEqual(self.post("individual", recipient_id=str(self.student.pk)).status_code, 403)
+            self.assertEqual(
+                self.post("individual", recipient_id=str(self.student.pk)).status_code,
+                403,
+            )
         self.assertEqual(HODMessage.objects.count(), 0)
 
     def test_service_rejects_nonhod_direct_call(self):
         for user in [AnonymousUser(), self.adviser, self.student_user]:
             with self.assertRaises(PermissionDenied):
-                send_hod_message(user=user, validated_data={
-                    "audience": "individual", "recipient_id": self.student.pk,
-                    "subject": "Meeting", "body": "Please attend."})
+                send_hod_message(
+                    user=user,
+                    validated_data={
+                        "audience": "individual",
+                        "recipient_id": self.student.pk,
+                        "subject": "Meeting",
+                        "body": "Please attend.",
+                    },
+                )
         self.assertEqual(HODMessage.objects.count(), 0)
 
     def test_hod_sends_individual_message_without_assignment(self):
@@ -79,16 +167,21 @@ class MessagingIntegrationTests(TestCase):
         self.assertEqual(message.recipients.count(), 0)
         self.assignment.is_active = False
         self.assignment.save(update_fields=["is_active"])
-        self.assertEqual(self.post("adviser", adviser_id=self.adviser.pk).status_code, 400)
+        self.assertEqual(
+            self.post("adviser", adviser_id=self.adviser.pk).status_code, 400
+        )
         self.assertEqual(HODMessage.objects.count(), 1)
 
     def test_invalid_and_conflicting_targets_do_not_save_messages(self):
         self.client.force_authenticate(self.hod)
         for audience, target in [
-            ("individual", {}), ("adviser", {}), ("level", {}),
+            ("individual", {}),
+            ("adviser", {}),
+            ("level", {}),
             ("level", {"level": 300, "recipient_id": str(self.student.pk)}),
             ("adviser", {"adviser_id": self.student_user.pk}),
-            ("level", {"level": 0}), ("level", {"level": 999}),
+            ("level", {"level": 0}),
+            ("level", {"level": 999}),
             ("individual", {"recipient_id": "invalid"}),
         ]:
             self.assertEqual(self.post(audience, **target).status_code, 400)
@@ -106,17 +199,29 @@ class MessagingIntegrationTests(TestCase):
         self.assertEqual(self.post("level", level=300).status_code, 403)
         self.assertEqual(HODMessage.objects.count(), 0)
         token = self.client.get("/api/auth/csrf/").data["csrfToken"]
-        response = self.client.post("/api/hod-messages/", {
-            "audience": "level", "level": 300, "subject": "Meeting", "body": "Please attend.",
-        }, format="json", HTTP_X_CSRFTOKEN=token)
+        response = self.client.post(
+            "/api/hod-messages/",
+            {
+                "audience": "level",
+                "level": 300,
+                "subject": "Meeting",
+                "body": "Please attend.",
+            },
+            format="json",
+            HTTP_X_CSRFTOKEN=token,
+        )
         self.assertEqual(response.status_code, 201)
 
     def test_hod_inbox_only_returns_saved_recipients(self):
         self.client.force_authenticate(self.hod)
         self.post("individual", recipient_id=str(self.student.pk))
         self.post("adviser", adviser_id=self.adviser.pk)
-        for user, count in [(self.student_user, 1), (self.other_user, 0),
-                            (self.adviser, 1), (self.other_staff, 0)]:
+        for user, count in [
+            (self.student_user, 1),
+            (self.other_user, 0),
+            (self.adviser, 1),
+            (self.other_staff, 0),
+        ]:
             self.client.force_authenticate(user)
             response = self.client.get("/api/me/hod-messages/")
             self.assertEqual(response.status_code, 200)
@@ -130,9 +235,16 @@ class MessagingIntegrationTests(TestCase):
         self.assertEqual(self.client.get("/api/me/hod-messages/").data["count"], 1)
 
     def test_adviser_inbox_is_isolated_and_read_only(self):
-        message = send_adviser_message(user=self.adviser, validated_data={
-            "assignment_id": self.assignment.pk, "audience": "individual",
-            "recipient_id": self.student.pk, "subject": "Meeting", "body": "Please attend."})
+        message = send_adviser_message(
+            user=self.adviser,
+            validated_data={
+                "assignment_id": self.assignment.pk,
+                "audience": "individual",
+                "recipient_id": self.student.pk,
+                "subject": "Meeting",
+                "body": "Please attend.",
+            },
+        )
         self.client.force_authenticate(self.student_user)
         response = self.client.get("/api/me/messages/")
         self.assertEqual(response.status_code, 200)
