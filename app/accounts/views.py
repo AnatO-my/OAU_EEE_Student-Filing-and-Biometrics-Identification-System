@@ -156,3 +156,12 @@ class MyHODMessagesView(generics.ListAPIView):
         return HODMessage.objects.filter(
             Q(recipients__user=self.request.user) | Q(adviser_recipients=self.request.user)
         ).select_related("sender").distinct()
+
+class MyStudentMessageDetailView(MyStudentMessagesView):
+    def get(self, request, *args, **kwargs):
+        message = get_object_or_404(
+            self.get_queryset(),
+            pk=kwargs["message_id"],
+        )
+        serializer = self.get_serializer(message)
+        return Response(serializer.data)

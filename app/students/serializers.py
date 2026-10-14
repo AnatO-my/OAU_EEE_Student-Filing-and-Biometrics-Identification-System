@@ -16,6 +16,7 @@ class StudentSerializer(serializers.ModelSerializer):
             "mode_of_admission",
             "current_level",
             "is_active",
+            "academic_status",
         ]
         read_only_fields = ["student_id"]
 
@@ -55,3 +56,48 @@ class StudentFilterSerializer(serializers.Serializer):
         required=False,
     )
     is_active = serializers.BooleanField(required=False)
+
+
+class BulkStudentLevelSerializer(serializers.Serializer):
+    student_ids = serializers.ListField(
+        child=serializers.UUIDField(), min_length=1, max_length=1000,
+    )
+    expected_level = serializers.IntegerField(min_value=1, max_value=32767)
+    current_level = serializers.IntegerField(min_value=1, max_value=32767)
+
+    def validate_student_ids(self, value):
+        if len(value) != len(set(value)):
+            raise serializers.ValidationError("Each student ID must appear only once.")
+        return value
+
+class BulkStudentStatusSerializer(serializers.Serializer):
+    student_ids = serializers.ListField(
+        child=serializers.UUIDField(),
+        min_length=1,
+        max_length=1000,
+    )
+    expected_status = serializers.ChoiceField(
+        choices=Student.AcademicStatus.choices,
+    )
+    academic_status = serializers.ChoiceField(
+        choices=Student.AcademicStatus.choices,
+    )
+
+    def validate_student_ids(self, value):
+        if len(value) != len(set(value)):
+            raise serializers.ValidationError(
+                "Each student ID must appear only once."
+            )
+        return value
+
+    def validate(self, attrs):
+        if attrs["expected_status"] == attrs["academic_status"]:
+            raise serializers.ValidationError({
+                "academic_status": "Choose a different destination status."
+            })
+        return attrs
+
+
+class ScopedGuardianSerializer(GuardianSerializer):
+    class Meta(GuardianSerializer.Meta):
+        read_only_fields = ["guardian_id", "student"]

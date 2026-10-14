@@ -94,6 +94,7 @@ INSTALLED_APPS = [
     "rest_framework",
     "students.apps.StudentsConfig",
     "accounts.apps.AccountsConfig",
+    "academics.apps.AcademicsConfig",
 ]
 
 MIDDLEWARE = [
@@ -196,3 +197,32 @@ CURRENT_ACADEMIC_SESSION = os.environ.get(
     "CURRENT_ACADEMIC_SESSION",
     "",
 )
+
+
+# React uses a same-origin /api proxy; no permissive CORS middleware is enabled.
+SESSION_COOKIE_HTTPONLY = True
+SESSION_COOKIE_SAMESITE = "Lax"
+SESSION_COOKIE_SECURE = SESSION_COOKIE_SECURE or not DEBUG
+CSRF_COOKIE_SECURE = CSRF_COOKIE_SECURE or not DEBUG
+PASSWORD_RESET_FRONTEND_URL = os.environ.get("PASSWORD_RESET_FRONTEND_URL", "")
+PASSWORD_RESET_TIMEOUT = 3600
+EMAIL_BACKEND = os.environ.get("DJANGO_EMAIL_BACKEND", "django.core.mail.backends.console.EmailBackend" if DEBUG else "django.core.mail.backends.smtp.EmailBackend")
+EMAIL_HOST = os.environ.get("DJANGO_EMAIL_HOST", "localhost")
+EMAIL_PORT = int(os.environ.get("DJANGO_EMAIL_PORT", "587"))
+EMAIL_HOST_USER = os.environ.get("DJANGO_EMAIL_HOST_USER", "")
+EMAIL_HOST_PASSWORD = os.environ.get("DJANGO_EMAIL_HOST_PASSWORD", "")
+EMAIL_USE_TLS = os.environ.get("DJANGO_EMAIL_USE_TLS", "true").lower() == "true"
+DEFAULT_FROM_EMAIL = os.environ.get("DJANGO_DEFAULT_FROM_EMAIL", "noreply@example.invalid")
+REST_FRAMEWORK["DEFAULT_THROTTLE_RATES"] = {
+    "password_reset": "20/hour", "password_reset_confirm": "60/hour",
+}
+
+
+# Bulk guardian reports stay disabled until providers are configured.
+RESULT_SHARING_ENABLED = os.environ.get("RESULT_SHARING_ENABLED", "false").lower() == "true"
+EMAIL_TIMEOUT = 20
+WHATSAPP_ACCESS_TOKEN = os.environ.get("WHATSAPP_ACCESS_TOKEN", "")
+WHATSAPP_PHONE_NUMBER_ID = os.environ.get("WHATSAPP_PHONE_NUMBER_ID", "")
+WHATSAPP_API_VERSION = os.environ.get("WHATSAPP_API_VERSION", "")
+WHATSAPP_RESULT_TEMPLATE = os.environ.get("WHATSAPP_RESULT_TEMPLATE", "")
+WHATSAPP_TEMPLATE_LANGUAGE = os.environ.get("WHATSAPP_TEMPLATE_LANGUAGE", "")
