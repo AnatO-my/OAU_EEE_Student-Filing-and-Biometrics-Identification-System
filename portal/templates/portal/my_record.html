@@ -1,25 +1,86 @@
-{% extends "portal/base.html" %}
-{% block title %}Log in{% endblock %}
+{% extends 'portal/base.html' %}
+
+{% block title %}Student Record - {{ student.name }}{% endblock %}
+
 {% block content %}
-<div class="card" style="max-width:440px; margin:40px auto">
-  {% if user.is_authenticated %}
-    <h1>You are already logged in</h1>
-    <p>You are logged in as <strong>{{ user.username }}</strong>. To log in as someone else, log out first.</p>
-    <form method="post" action="{% url 'logout' %}" class="inline">
-      {% csrf_token %}
-      <button class="primary" type="submit">Log out</button>
-    </form>
-    &nbsp; <a href="{% url 'home' %}">Continue to my pages</a>
-  {% else %}
-    <h1>Log in</h1>
-    <p>Students: your username is your <strong>matric number</strong>. Your first password is your
-       <strong>surname</strong>; you will be asked to choose a new one straight away.</p>
-    <form method="post">
-      {% csrf_token %}
-      {{ form.as_p }}
-      <input type="hidden" name="next" value="{{ next }}">
-      <button class="primary" type="submit">Log in</button>
-    </form>
-  {% endif %}
+<div class="container mt-4" style="max-width: 800px;">
+    
+    <!-- Student Header Card -->
+    <div class="card shadow-sm p-4 mb-4">
+        <h2>{{ student.name }}</h2>
+        <p class="text-muted mb-1"><strong>Matric Number:</strong> {{ student.matric_number }}</p>
+        <p class="text-muted mb-1"><strong>Level:</strong> {{ student.level }} | <strong>Status:</strong> {{ student.status }}</p>
+        <p class="text-muted"><strong>CGPA:</strong> {{ cgpa|default:"N/A" }}</p>
+    </div>
+
+    <!-- Cloud Storage & Upload Section -->
+    <div class="card shadow-sm p-4 mb-4">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <div>
+                <h4>Cloud Storage & Documents</h4>
+                <p class="text-muted mb-0">You have a cumulative pool of <strong>5MB</strong> for all uploaded documents.</p>
+            </div>
+            <a href="{% url 'upload_student_file' %}" class="btn btn-primary">Upload New File</a>
+        </div>
+
+        <!-- Display Flash Messages (e.g., upload success/quota warnings) -->
+        {% if messages %}
+            {% for message in messages %}
+                <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+                    {{ message }}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>
+            {% endfor %}
+        {% endif %}
+
+        <!-- List of Uploaded Files -->
+        <ul class="list-group mt-3">
+            {% for file in student.files.all %}
+                <li class="list-group-item d-flex justify-content-between align-items-center">
+                    <div>
+                        <a href="{{ file.cloud_url.url }}" target="_blank" class="fw-bold text-decoration-none">
+                            {{ file.get_file_type_display|default:file.file_type }}
+                        </a>
+                        <br><small class="text-muted">Uploaded on {{ file.uploaded_at|date:"M d, Y H:i" }}</small>
+                    </div>
+                    <span class="badge bg-secondary rounded-pill">{{ file.file_size|filesizeformat }}</span>
+                </li>
+            {% empty %}
+                <li class="list-group-item text-muted text-center py-3">No files uploaded to cloud storage yet.</li>
+            {% endfor %}
+        </ul>
+    </div>
+
+    <!-- Academic Overview / Results Section -->
+    <div class="card shadow-sm p-4">
+        <h4>Academic Records & Results</h4>
+        {% if results %}
+            <table class="table table-striped mt-3">
+                <thead>
+                    <tr>
+                        <th>Course Code</th>
+                        <th>Session</th>
+                        <th>Semester</th>
+                        <th>Score</th>
+                        <th>Grade</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for result in results %}
+                        <tr>
+                            <td>{{ result.course.code }}</td>
+                            <td>{{ result.session }}</td>
+                            <td>{{ result.get_semester_display }}</td>
+                            <td>{{ result.score }}</td>
+                            <td>{{ result.grade }}</td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        {% else %}
+            <p class="text-muted mt-2">No results recorded for this student yet.</p>
+        {% endif %}
+    </div>
+
 </div>
 {% endblock %}

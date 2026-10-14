@@ -16,6 +16,7 @@ urlpatterns = [
     path("results/", views.results_search, name="results_search"),
     path("students/", views.students_list, name="students_list"),
     path("students/<int:pk>/", views.student_detail, name="student_detail"),
+    path("upload/file/", views.upload_student_file, name="upload_student_file"),
 
     path("upload/data/", views.upload_data, name="upload_data"),             # HOD only
     path("upload-matrics/", views.upload_matric, name="upload_matric"),      # HOD only (New bulk matric upload)

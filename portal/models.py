@@ -203,8 +203,10 @@ class Guardian(models.Model):
 # ---------------- TABLE 8: Files ----------------
 class StudentFile(models.Model):
     student = models.ForeignKey(Student, on_delete=models.CASCADE, related_name="files")
-    file_type = models.CharField(max_length=50)
-    cloud_url = models.URLField(max_length=500)
+    file_type = models.CharField(max_length=50, default="document")
+    cloud_url = models.FileField(upload_to="student_files/")
+    file_size = models.PositiveIntegerField(default=0)  # Stores size in bytes
+    uploaded_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
         constraints = [

@@ -311,17 +311,29 @@ def upload_student_file(request):
             messages.error(request, "Please select a file to upload.")
             return redirect("upload_student_file")
 
-        # Check 5MB limit programmatically
-        if file_obj.size > 5 * 1024 * 1024:
-            messages.error(request, "File is too large! Maximum allowed size is 5MB.")
+        file_size = file_obj.size
+        MAX_TOTAL_STORAGE = 5 * 1024 * 1024  # 5 MB in bytes
+
+        # 1. Calculate cumulative storage already used by this student
+        existing_files = StudentFile.objects.filter(student=student)
+        total_used_space = sum(f.file_size for f in existing_files)
+
+        # 2. Check if adding this new file exceeds the 5MB total limit
+        if total_used_space + file_size > MAX_TOTAL_STORAGE:
+            remaining_kb = max(0, (MAX_TOTAL_STORAGE - total_used_space)) / 1024
+            messages.error(
+                request, 
+                f"Storage quota exceeded! You have {remaining_kb:.1f} KB remaining out of your 5MB limit."
+            )
             return redirect("upload_student_file")
 
         try:
-            # Saving the file automatically pushes it to your Neon Object Storage bucket
+            # 3. Save file to Neon storage and record its size in the database
             student_file = StudentFile(
                 student=student,
                 file_type=file_type,
-                cloud_url=file_obj  # django-storages uploads this and stores the storage URL string
+                cloud_url=file_obj,
+                file_size=file_size
             )
             student_file.save()
             messages.success(request, "File uploaded successfully to your cloud storage!")

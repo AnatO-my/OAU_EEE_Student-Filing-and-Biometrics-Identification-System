@@ -1,0 +1,45 @@
+{% extends 'portal/base.html' %}
+
+{% block content %}
+<div class="container mt-5" style="max-width: 600px;">
+    <div class="card shadow-sm p-4">
+        <h2 class="mb-3">Upload Document to Cloud Storage</h2>
+        <p class="text-muted">You have a maximum cumulative pool of <strong>5MB</strong> for all uploaded files.</p>
+
+        <!-- Display success or error messages -->
+        {% if messages %}
+            {% for message in messages %}
+                <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+                    {{ message }}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>
+            {% endfor %}
+        {% endif %}
+
+        <!-- Upload Form -->
+        <form method="POST" enctype="multipart/form-data">
+            {% csrf_token %}
+            
+            <div class="mb-3">
+                <label for="file_type" class="form-label">File Type</label>
+                <select name="file_type" id="file_type" class="form-select">
+                    <option value="document">General Document</option>
+                    <option value="transcript">Transcript / Academic Record</option>
+                    <option value="ID">Identification Card</option>
+                </select>
+            </div>
+
+            <div class="mb-3">
+                <label for="file" class="form-label">Select File (Max 5MB total pool)</label>
+                <input type="file" name="file" id="file" class="form-control" required>
+            </div>
+
+            <button type="submit" class="btn btn-primary w-100">Upload to Neon Cloud</button>
+        </form>
+
+        <div class="mt-3 text-center">
+            <a href="{% url 'my_record' %}" class="text-decoration-none">← Back to My Record</a>
+        </div>
+    </div>
+</div>
+{% endblock %}
