@@ -3,11 +3,14 @@ from django.contrib.auth.models import Permission
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import TestCase, override_settings
 from rest_framework.test import APIClient
-
 from accounts.models import AdviserAssignment
 from students.models import Student
-
 from .models import StudentDocument
+from django.test import SimpleTestCase
+from .ocr import OcrResult
+from .services import assess_quality
+
+
 
 PDF_BYTES = b"%PDF-1.4\nsynthetic test document\n%%EOF\n"
 
@@ -52,7 +55,7 @@ class UploadTests(TestCase):
         )
 
     def post_pdf(self, url=None):
-        return self.client.post(url or self.url, {"file": make_pdf()}, format="multipart")
+        return self.client.post(url or self.url, {"file": make_pdf(), "document_type": "result"}, format="multipart")
 
     def test_staff_can_upload_a_pdf(self):
         self.client.force_authenticate(self.staff)
@@ -82,3 +85,20 @@ class UploadTests(TestCase):
         response = self.post_pdf(f"/api/students/{other.student_id}/documents/")
         self.assertEqual(response.status_code, 404)
         self.assertEqual(StudentDocument.objects.count(), 0)
+class QualityGateTests(SimpleTestCase):
+    def test_clear_scan_is_accepted(self):
+        decision = assess_quality(OcrResult(text="Course results " * 20, confidence=91))
+        self.assertTrue(decision.accepted)
+        self.assertEqual(decision.status, "accepted")
+
+    def test_low_confidence_is_rejected(self):
+        decision = assess_quality(OcrResult(text="Course results " * 20, confidence=32))
+        self.assertFalse(decision.accepted)
+
+    def test_almost_no_text_is_rejected(self):
+        decision = assess_quality(OcrResult(text="   ", confidence=95))
+        self.assertFalse(decision.accepted)
+
+    def test_missing_confidence_is_judged_on_text_alone(self):
+        decision = assess_quality(OcrResult(text="Course results " * 20))
+        self.assertTrue(decision.accepted)

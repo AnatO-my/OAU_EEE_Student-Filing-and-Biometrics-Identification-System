@@ -10,15 +10,23 @@ def private_storage():
     """Where files are saved. No public URL points here."""
     return FileSystemStorage(location=settings.PRIVATE_MEDIA_ROOT)
 
+import os
+
 def document_upload_path(instance, filename):
-    # The server picks the file name, never the user. A malicious name
-    # like "../../x.pdf" then cannot choose where the file lands.
-    return f"documents/{instance.student_id}/{uuid.uuid4().hex}.pdf"
+    extension = os.path.splitext(filename)[1].lower()
+    if extension not in {".pdf", ".jpg", ".jpeg", ".png"}:
+        extension = ""
+    return f"documents/{instance.student_id}/{uuid.uuid4().hex}{extension}"
 
 class StudentDocument(models.Model):
     class DocumentType(models.TextChoices):
         RESULT = "result", "Result"
+        BIODATA = "biodata", "Biodata"
+        BIRTH_CERTIFICATE = "birth_cecrtificate", "Birth certificate"
         OTHER = "other", "other"
+    class Status(models.TextChoices):
+        ACCEPTED = "accepted", "Accepted"
+        NEEDS_REVIEW = "needs_review", "Needs review"
 
     document_id = models.UUIDField(
         primary_key=True,
@@ -40,6 +48,15 @@ class StudentDocument(models.Model):
         storage=private_storage,
     )
     original_filename = models.CharField(max_length=255)
+    status = models.CharField(
+        max_length=20,
+        choices=Status.choices,
+        default=Status.NEEDS_REVIEW,
+    )
+    ocr_text = models.TextField(blank=True)
+    ocr_confidence = models.FloatField(null=True, blank=True)
+    quality_notes = models.CharField(max_length=255, blank=True)
+    superseded_at = models.DateTimeField(null=True, blank=True)
     uploaded_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.PROTECT,

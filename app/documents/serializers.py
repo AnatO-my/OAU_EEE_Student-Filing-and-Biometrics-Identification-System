@@ -3,7 +3,14 @@ from rest_framework import serializers
 
 from .models import StudentDocument
 
-PDF_MAGIC = b"%PDF-"
+import os
+
+FILE_SIGNATURES = {
+    ".pdf": b"%PDF-",
+    ".jpg": b"\xff\xd8\xff",
+    ".jpeg": b"\xff\xd8\xff",
+    ".png": b"\x89PNG\r\n\x1a\n",
+}
 
 
 class DocumentUploadSerializer(serializers.Serializer):
@@ -19,12 +26,16 @@ class DocumentUploadSerializer(serializers.Serializer):
         if value.size > settings.DOCUMENT_MAX_UPLOAD_BYTES:
             limit_mb = settings.DOCUMENT_MAX_UPLOAD_BYTES // (1024 * 1024)
             raise serializers.ValidationError(f"The file is larger than {limit_mb} MB.")
-        if not value.name.lower().endswith(".pdf"):
-            raise serializers.ValidationError("Only PDF files are accepted.")
-        header = value.read(len(PDF_MAGIC))
+        extension = os.path.splitext(value.name.lower())[1]
+        signature = FILE_SIGNATURES.get(extension)
+        if signature is None:
+            raise serializers.ValidationError(
+                "Only PDF, JPEG and PNG files are accepted."
+            )
+        header = value.read(len(signature))
         value.seek(0)
-        if header != PDF_MAGIC:
-            raise serializers.ValidationError("The file is not a valid PDF.")
+        if header != signature:
+            raise serializers.ValidationError("The file content does not match its type.")
         return value
 class StudentDocumentSerializer(serializers.ModelSerializer):
     class Meta:

@@ -202,3 +202,8 @@ PRIVATE_MEDIA_ROOT = os.environ.get(
     "PRIVATE_MEDIA_ROOT", str(BASE_DIR / "private_media")
 )
 DOCUMENT_MAX_UPLOAD_BYTES = 10 * 1024 * 1024  # proposed limit: 10 MB
+# Quality gate thresholds (tune on real result sheets once OCR is connected).
+DOCUMENT_OCR_MIN_CONFIDENCE = 60  # percent
+DOCUMENT_OCR_MIN_CHARACTERS = 50
+# Dotted path of the OCR function; see documents/ocr.py for the contract.
+DOCUMENT_OCR_BACKEND = "documents.ocr.placeholder_extract_text"
