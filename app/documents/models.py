@@ -22,7 +22,7 @@ class StudentDocument(models.Model):
     class DocumentType(models.TextChoices):
         RESULT = "result", "Result"
         BIODATA = "biodata", "Biodata"
-        BIRTH_CERTIFICATE = "birth_cecrtificate", "Birth certificate"
+        BIRTH_CERTIFICATE = "birth_cecrtificate", "birth certificate"
         OTHER = "other", "other"
     class Status(models.TextChoices):
         ACCEPTED = "accepted", "Accepted"
@@ -41,7 +41,6 @@ class StudentDocument(models.Model):
     document_type = models.CharField(
         max_length=20,
         choices=DocumentType.choices,
-        default=DocumentType.RESULT,
     )
     file = models.FileField(
         upload_to=document_upload_path,

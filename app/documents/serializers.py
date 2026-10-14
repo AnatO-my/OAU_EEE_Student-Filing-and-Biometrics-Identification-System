@@ -17,7 +17,6 @@ class DocumentUploadSerializer(serializers.Serializer):
     file = serializers.FileField()
     document_type = serializers.ChoiceField(
         choices=StudentDocument.DocumentType.choices,
-        default=StudentDocument.DocumentType.RESULT,
     )
 
     def validate_file(self, value):

@@ -130,6 +130,19 @@ class UploadTests(TestCase):
         self.assertEqual(
             StudentDocument.objects.filter(superseded_at__isnull=True).count(), 1
         )
+    def test_document_type_is_required(self):
+        self.client.force_authenticate(self.staff)
+        response = self.client.post(self.url, {"file": make_pdf()}, format="multipart")
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(StudentDocument.objects.count(), 0)
+
+    def test_renamed_file_is_rejected(self):
+        self.client.force_authenticate(self.staff)
+        fake = SimpleUploadedFile("results.pdf", b"MZ not really a pdf")
+        response = self.client.post(
+            self.url, {"file": fake, "document_type": "result"}, format="multipart"
+        )
+        self.assertEqual(response.status_code, 400)
 class QualityGateTests(SimpleTestCase):
     def test_clear_scan_is_accepted(self):
         decision = assess_quality(OcrResult(text="Course results " * 20, confidence=91))
@@ -147,3 +160,4 @@ class QualityGateTests(SimpleTestCase):
     def test_missing_confidence_is_judged_on_text_alone(self):
         decision = assess_quality(OcrResult(text="Course results " * 20))
         self.assertTrue(decision.accepted)
+   
