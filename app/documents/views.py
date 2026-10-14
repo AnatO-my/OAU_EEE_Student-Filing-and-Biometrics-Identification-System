@@ -4,10 +4,10 @@ from django.shortcuts import get_object_or_404
 from rest_framework import permissions, status
 from rest_framework.parsers import MultiPartParser
 from rest_framework.response import Response
+from rest_framework import permissions, status
 from rest_framework.views import APIView
-
+from .services import process_upload
 from django.conf import settings
-
 from .models import StudentDocument
 from .serializers import DocumentUploadSerializer, StudentDocumentSerializer
 from students.permissions import StudentModelPermissions
@@ -28,12 +28,23 @@ class StudentDocumentView(APIView):
         form.is_valid(raise_exception=True)
         uploaded = form.validated_data["file"]
 
-        document = StudentDocument.objects.create(
+        document, decision = process_upload(
             student=student,
+            uploaded_file=form.validated_data["file"],
             document_type=form.validated_data["document_type"],
-            file=uploaded,
-            original_filename=uploaded.name[:255],
             uploaded_by=request.user,
+        )
+        if document is None:
+            return Response(
+                {
+                    "detail": "Document rejected: please upload a clearer scan.",
+                    "reasons": decision.reasons,
+                },
+                status=status.HTTP_422_UNPROCESSABLE_ENTITY,
+         )
+        return Response(
+            StudentDocumentSerializer(document).data,
+            status=status.HTTP_201_CREATED,
         )
         return Response(
             StudentDocumentSerializer(document).data,

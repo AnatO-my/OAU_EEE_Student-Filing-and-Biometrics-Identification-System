@@ -17,7 +17,12 @@ PDF_BYTES = b"%PDF-1.4\nsynthetic test document\n%%EOF\n"
 
 def make_pdf():
     return SimpleUploadedFile("results.pdf", PDF_BYTES, content_type="application/pdf")
+def clear_scan_ocr(path):
+    return OcrResult(text="Course results " * 20, confidence=91.0)
 
+
+def blurry_scan_ocr(path):
+    return OcrResult(text="Course results " * 20, confidence=32.0)
 
 @override_settings(CURRENT_ACADEMIC_SESSION="2026/2027")
 class UploadTests(TestCase):
@@ -85,6 +90,46 @@ class UploadTests(TestCase):
         response = self.post_pdf(f"/api/students/{other.student_id}/documents/")
         self.assertEqual(response.status_code, 404)
         self.assertEqual(StudentDocument.objects.count(), 0)
+    def test_clear_scan_is_accepted(self):
+        self.client.force_authenticate(self.staff)
+        with self.settings(DOCUMENT_OCR_BACKEND="documents.tests.clear_scan_ocr"):
+            response = self.post_pdf()
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(response.data["status"], "accepted")
+
+    def test_blurry_scan_is_rejected_and_not_saved(self):
+        self.client.force_authenticate(self.staff)
+        with self.settings(DOCUMENT_OCR_BACKEND="documents.tests.blurry_scan_ocr"):
+            response = self.post_pdf()
+        self.assertEqual(response.status_code, 422)
+        self.assertEqual(StudentDocument.objects.count(), 0)
+
+    def test_unavailable_ocr_keeps_file_for_review(self):
+        self.client.force_authenticate(self.staff)
+        response = self.post_pdf()
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(response.data["status"], "needs_review")
+
+    def test_new_upload_supersedes_the_old_one(self):
+        self.client.force_authenticate(self.staff)
+        with self.settings(DOCUMENT_OCR_BACKEND="documents.tests.clear_scan_ocr"):
+            self.post_pdf()
+            self.post_pdf()
+        self.assertEqual(StudentDocument.objects.count(), 2)
+        self.assertEqual(
+            StudentDocument.objects.filter(superseded_at__isnull=True).count(), 1
+        )
+
+    def test_rejected_rescan_keeps_the_old_document_current(self):
+        self.client.force_authenticate(self.staff)
+        with self.settings(DOCUMENT_OCR_BACKEND="documents.tests.clear_scan_ocr"):
+            self.assertEqual(self.post_pdf().status_code, 201)
+        with self.settings(DOCUMENT_OCR_BACKEND="documents.tests.blurry_scan_ocr"):
+            self.assertEqual(self.post_pdf().status_code, 422)
+        self.assertEqual(StudentDocument.objects.count(), 1)
+        self.assertEqual(
+            StudentDocument.objects.filter(superseded_at__isnull=True).count(), 1
+        )
 class QualityGateTests(SimpleTestCase):
     def test_clear_scan_is_accepted(self):
         decision = assess_quality(OcrResult(text="Course results " * 20, confidence=91))

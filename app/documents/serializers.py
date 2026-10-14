@@ -46,5 +46,8 @@ class StudentDocumentSerializer(serializers.ModelSerializer):
             "document_type",
             "original_filename",
             "uploaded_at",
+            "status",
+            "ocr_confidence",
+            "quality_notes",
         ]
         read_only_fields = fields
