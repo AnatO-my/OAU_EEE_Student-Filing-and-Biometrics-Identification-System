@@ -23,9 +23,6 @@ urlpatterns = [
     path("api/", include("students.urls")),
     path("api/auth/", include("accounts.urls")),
     path("api/", include("accounts.message_urls")),
-<<<<<<< HEAD
     path("api/", include("documents.urls")),
-=======
     path("api/", include("academics.urls")),
->>>>>>> origin/main
 ]
