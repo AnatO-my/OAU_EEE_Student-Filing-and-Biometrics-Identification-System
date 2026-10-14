@@ -1,15 +1,14 @@
-from django.shortcuts import render
-
+from django.conf import settings
 from django.shortcuts import get_object_or_404
 from rest_framework import permissions, status
 from rest_framework.parsers import MultiPartParser
 from rest_framework.response import Response
-from rest_framework import permissions, status
 from rest_framework.views import APIView
+
 from .services import process_upload
-from django.conf import settings
 from .models import StudentDocument
 from .serializers import DocumentUploadSerializer, StudentDocumentSerializer
+
 from students.permissions import StudentModelPermissions
 from students.services import students_visible_to
 
@@ -26,7 +25,6 @@ class StudentDocumentView(APIView):
 
         form = DocumentUploadSerializer(data=request.data)
         form.is_valid(raise_exception=True)
-        uploaded = form.validated_data["file"]
 
         document, decision = process_upload(
             student=student,
@@ -42,10 +40,6 @@ class StudentDocumentView(APIView):
                 },
                 status=status.HTTP_422_UNPROCESSABLE_ENTITY,
          )
-        return Response(
-            StudentDocumentSerializer(document).data,
-            status=status.HTTP_201_CREATED,
-        )
         return Response(
             StudentDocumentSerializer(document).data,
             status=status.HTTP_201_CREATED,
