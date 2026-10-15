@@ -94,6 +94,7 @@ INSTALLED_APPS = [
     "rest_framework",
     "students.apps.StudentsConfig",
     "accounts.apps.AccountsConfig",
+    "documents.apps.DocumentsConfig",
     "academics.apps.AcademicsConfig",
 ]
 
@@ -197,6 +198,16 @@ CURRENT_ACADEMIC_SESSION = os.environ.get(
     "CURRENT_ACADEMIC_SESSION",
     "",
 )
+# Uploaded documents are private: stored outside any publicly served folder.
+PRIVATE_MEDIA_ROOT = os.environ.get(
+    "PRIVATE_MEDIA_ROOT", str(BASE_DIR / "private_media")
+)
+DOCUMENT_MAX_UPLOAD_BYTES = 10 * 1024 * 1024  # proposed limit: 10 MB
+# Quality gate thresholds (tune on real result sheets once OCR is connected).
+DOCUMENT_OCR_MIN_CONFIDENCE = 60  # percent
+DOCUMENT_OCR_MIN_CHARACTERS = 50
+# Dotted path of the OCR function; see documents/ocr.py for the contract.
+DOCUMENT_OCR_BACKEND = "documents.ocr.placeholder_extract_text"
 
 
 # React uses a same-origin /api proxy; no permissive CORS middleware is enabled.
@@ -226,3 +237,4 @@ WHATSAPP_PHONE_NUMBER_ID = os.environ.get("WHATSAPP_PHONE_NUMBER_ID", "")
 WHATSAPP_API_VERSION = os.environ.get("WHATSAPP_API_VERSION", "")
 WHATSAPP_RESULT_TEMPLATE = os.environ.get("WHATSAPP_RESULT_TEMPLATE", "")
 WHATSAPP_TEMPLATE_LANGUAGE = os.environ.get("WHATSAPP_TEMPLATE_LANGUAGE", "")
+
