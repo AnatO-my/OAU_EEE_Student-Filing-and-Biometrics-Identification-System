@@ -2,7 +2,8 @@
 
 This branch imports the reviewed React portal into `frontend/portal/` as a
 starting point for integration. It does not make the prototype screens live.
-The frontend source is unchanged from the pinned upstream commit.
+The import commit preserves the pinned upstream files. Subsequent compatibility
+changes are documented in [frontend-integration.md](frontend-integration.md).
 
 ## Source
 
@@ -32,18 +33,12 @@ this in a file only works if the launcher loads that file. Use an existing
 department-issued account. The portal proxies `/api/` to the backend.
 Port 5175 avoids the existing guardian-results development app's port 5173.
 
-## Integration work still required
+## Compatibility work after import
 
-1. Bind portal routes, displayed roles and data to the authenticated identity
-   and permissions. Replace the portal's demo logout with the real sign-out.
-2. Load student class attendance through the staff class-record endpoints.
-   Remove silent sample-data fallback and false connected/live indicators.
-3. Preserve original JSONL bytes and `application/x-ndjson` in capture-upload
-   helpers; the current common request function converts them to JSON.
-4. Add the password-reset completion form and fix source-directory image URLs
-   that do not exist in production build output.
-5. Connect the other prototype screens and preserve/integrate the existing
-   guardian-results UI. The document-upload feature on main has no portal UI yet.
+Protected live routes, real logout, class attendance reads, raw JSONL uploads,
+reset completion and built image URLs are now implemented. The existing guardian
+workflow is embedded and document uploads use the multipart API. See the
+integration document for verification and remaining prototype scope.
 
 Attendance and database current-session selection were reviewed against local
 uncommitted backend work and are not on this branch's main base. Reconcile and

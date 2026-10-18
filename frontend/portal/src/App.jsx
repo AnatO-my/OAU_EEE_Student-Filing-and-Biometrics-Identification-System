@@ -9,10 +9,14 @@ import PortalNotice from "./pages/PortalNotice";
 import InformationPage from "./pages/InformationPage";
 import Admindashboard from "./pages/Admindashboard";
 import Studentprofile from "./pages/Studentprofile";
-import AttendanceDashboard from "./pages/AttendanceDashboard";
 import { AuthProvider } from "./auth/AuthContext";
+import RequireAuth from './auth/RequireAuth';
+import ResetPassword from './pages/ResetPassword';
+import './live.css';
 
-const Portal = lazy(() => import("./pages/Portal"));
+const DemoPortal = lazy(() => import("./pages/Portal"));
+const LivePortal = lazy(() => import('./pages/LivePortal'));
+const AttendanceDashboard = lazy(() => import('./pages/AttendanceDashboard'));
 
 function App() {
   return (
@@ -24,13 +28,16 @@ function App() {
               <Route path="/" element={<AppLayout />}>
                 <Route index element={<Landing />} />
                 <Route path="admin" element={<Admindashboard />} />
-                <Route path="attendance" element={<AttendanceDashboard />} />
+                <Route path="attendance" element={<RequireAuth staff permission="attendance.view_attendance"><AttendanceDashboard /></RequireAuth>} />
+                <Route path="guardian-results/*" element={<Navigate to="/portal/hod/guardian-results" replace />} />
                 <Route path="student" element={<Studentprofile />} />
                 <Route path="student/profile" element={<Navigate to="/portal/student/profile" replace />} />
-                <Route path="portal/:role/:section?" element={<Portal />} />
+                <Route path="portal/:role/:section?" element={<RequireAuth><LivePortal /></RequireAuth>} />
+                <Route path="demo/:role/:section?" element={<DemoPortal />} />
                 <Route path="login" element={<Login />} />
                 <Route path="register" element={<Register />} />
                 <Route path="recover-password" element={<PortalNotice />} />
+                <Route path="reset-password" element={<ResetPassword />} />
                 <Route path="session-expired" element={<PortalNotice />} />
                 <Route path="access-denied" element={<PortalNotice />} />
                 <Route path="help" element={<InformationPage />} />

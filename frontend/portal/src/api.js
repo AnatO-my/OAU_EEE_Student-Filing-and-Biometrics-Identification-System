@@ -1,5 +1,18 @@
 let csrfToken = null;
 let csrfRequest = null;
+let sessionEpoch = 0;
+const sessionChecks = new Set();
+
+export function subscribeSessionCheck(listener) {
+  sessionChecks.add(listener);
+  return () => sessionChecks.delete(listener);
+}
+
+export function forgetSession() {
+  csrfToken = null;
+  csrfRequest = null;
+  sessionEpoch += 1;
+}
 
 export class ApiError extends Error {
   constructor(message, status, details = null, retryAfter = null) {
@@ -45,8 +58,10 @@ function requestErrorMessage(details, status) {
 
 export async function apiRequest(
   path,
-  { method = "GET", query = {}, body, signal, responseType = "json", headers: extraHeaders = {} } = {},
+  { method = "GET", query = {}, body, rawBody, signal, responseType = "json", headers: extraHeaders = {} } = {},
 ) {
+  if (body !== undefined && rawBody !== undefined) throw new TypeError("Choose a JSON body or a raw body.");
+  const epoch = sessionEpoch;
   const verb = method.toUpperCase();
   const headers = {
     Accept: responseType === "blob" ? "text/csv" : "application/json",
@@ -61,14 +76,16 @@ export async function apiRequest(
     headers["Content-Type"] = "application/json";
   }
 
+  if (epoch !== sessionEpoch) throw new ApiError("The session changed. Sign in again.", 401);
   const response = await fetch(buildApiUrl(path, query), {
     method: verb,
     credentials: "same-origin",
     cache: "no-store",
     headers,
-    body: body === undefined ? undefined : JSON.stringify(body),
+    body: rawBody !== undefined ? rawBody : body === undefined ? undefined : JSON.stringify(body),
     signal,
   });
+  if (epoch !== sessionEpoch) throw new ApiError("The session changed. Sign in again.", 401);
 
   if (!response.ok) {
     const text = await response.text();
@@ -79,6 +96,13 @@ export async function apiRequest(
       } catch {
         details = null;
       }
+    }
+    const identityEndpoints = ['/api/auth/csrf/', '/api/auth/me/', '/api/auth/login/', '/api/auth/logout/', '/api/auth/password/reset/', '/api/auth/password/reset/confirm/'];
+    if ([401, 403].includes(response.status) && !identityEndpoints.includes(path)) {
+      csrfToken = null;
+      csrfRequest = null;
+      // A denied operation may mean missing permission, so verify /me before clearing identity.
+      sessionChecks.forEach((listener) => listener());
     }
     throw new ApiError(
       requestErrorMessage(details, response.status),
@@ -97,7 +121,9 @@ export async function apiRequest(
     );
   }
 
-  return response.json();
+  const data = await response.json();
+  if (epoch !== sessionEpoch) throw new ApiError("The session changed. Sign in again.", 401);
+  return data;
 }
 
 function apiGet(path, query = {}, signal) {
@@ -123,7 +149,7 @@ export async function getCsrfToken({ refresh = false } = {}) {
   }
   if (csrfToken) return csrfToken;
   if (!csrfRequest) {
-    csrfRequest = apiGet("/api/auth/csrf/")
+    const pending = apiGet("/api/auth/csrf/")
       .then((data) => {
         const token = data?.csrfToken;
         if (typeof token !== "string" || !token) {
@@ -133,22 +159,23 @@ export async function getCsrfToken({ refresh = false } = {}) {
         return token;
       })
       .finally(() => {
-        csrfRequest = null;
+        if (csrfRequest === pending) csrfRequest = null;
       });
+    csrfRequest = pending;
   }
   return csrfRequest;
 }
 
 export async function login(username, password) {
   const identity = await apiPost("/api/auth/login/", { username, password });
+  forgetSession();
   await getCsrfToken({ refresh: true });
   return identity;
 }
 
 export async function logout() {
   await apiPost("/api/auth/logout/");
-  csrfToken = null;
-  csrfRequest = null;
+  forgetSession();
 }
 
 export function getCurrentUser(signal) {
@@ -530,22 +557,29 @@ export function getMyAttendance(page = 1, signal) {
   return apiGet("/api/me/attendance/", { page }, signal);
 }
 
-export function previewPendingCaptures(sessionId, fileBody, captureHash) {
+export function previewPendingCaptures(sessionId, fileBody) {
   return apiRequest(`/api/attendance/sessions/${pathId(sessionId)}/pending-batches/preview/`, {
     method: "POST",
-    body: fileBody,
-    headers: { "Content-Type": "application/x-ndjson", "X-Capture-SHA256": captureHash },
+    rawBody: fileBody,
+    headers: { "Content-Type": "application/x-ndjson" },
   });
 }
 
 export function importPendingCaptures(sessionId, fileBody, captureHash) {
   return apiRequest(`/api/attendance/sessions/${pathId(sessionId)}/pending-batches/`, {
     method: "POST",
-    body: fileBody,
+    rawBody: fileBody,
     headers: { "Content-Type": "application/x-ndjson", "X-Capture-SHA256": captureHash },
   });
 }
 
 export function listPendingCaptureBatches(sessionId, page = 1, signal) {
   return apiGet(`/api/attendance/sessions/${pathId(sessionId)}/pending-batches/`, { page }, signal);
+}
+
+export function uploadStudentDocument(studentId, file, documentType) {
+  const form = new FormData();
+  form.set('file', file);
+  form.set('document_type', documentType);
+  return apiRequest(`/api/students/${pathId(studentId)}/documents/`, { method: 'POST', rawBody: form });
 }

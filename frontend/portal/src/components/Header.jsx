@@ -3,6 +3,7 @@ import Navbar from "./Navbar";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
 import { useAuth } from "../auth/useAuth";
+import logo from '../assets/logo1.jpg';
 
 const Header = () => {
   const { pathname } = useLocation();
@@ -51,7 +52,7 @@ const Header = () => {
         <Link to="/">
           <div className="logo flex items-center gap-3">
             <img
-              src="/src/assets/logo1.jpg"
+              src={logo}
               alt="Logo"
               width="80"
               height="80"

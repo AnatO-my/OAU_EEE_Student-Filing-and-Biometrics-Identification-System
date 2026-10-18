@@ -1,291 +1,95 @@
-﻿import { useEffect, useMemo, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
-import { useAuth } from "../auth/useAuth";
-import {
-  getCurrentAcademicSession,
-  getMyAttendance,
-  listAttendanceSessions,
-} from "../api";
-import "./AttendanceDashboard.css";
+import { useCallback, useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
+import { getAttendanceSession, getCurrentAcademicSession, importPendingCaptures, listAttendanceRecords, listAttendanceSessions, previewPendingCaptures } from '../api';
+import { useAuth } from '../auth/useAuth';
+import { hasPermission, workspaceHome } from '../auth/permissions';
+import { LoadState, Pager } from '../components/LiveData';
+import { useRemote } from '../useRemote';
 
-const sampleRecords = [
-  { name: "Adebayo Olumide", staffId: "EEE/STAFF/021", department: "Power Systems", time: "08:04 AM", status: "Present" },
-  { name: "Akinola Tobi", staffId: "EEE/STAFF/014", department: "Electronics", time: "08:12 AM", status: "Present" },
-  { name: "Balogun Ife", staffId: "EEE/STAFF/032", department: "Telecommunications", time: "08:23 AM", status: "Late" },
-  { name: "Oluwaseun Ade", staffId: "EEE/STAFF/008", department: "Control & Instrumentation", time: "08:31 AM", status: "Present" },
-];
+function time(value) {
+  return value ? new Date(value).toLocaleString() : 'Not recorded';
+}
 
-function formatTime(value) {
-  if (!value) return "Not recorded";
-  const date = new Date(value);
-  if (!Number.isNaN(date.getTime())) {
-    return date.toLocaleString([], {
-      year: "numeric",
-      month: "short",
-      day: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-    });
+function CurrentSession() {
+  const resource = useRemote(getCurrentAcademicSession);
+  return <LoadState resource={resource}>{data => <p>Current academic session: {data.name || 'Not selected'}</p>}</LoadState>;
+}
+
+export function PendingCaptureUpload({ sessionId }) {
+  const [file, setFile] = useState(null);
+  const [preview, setPreview] = useState(null);
+  const [reviewed, setReviewed] = useState(false);
+  const [receipt, setReceipt] = useState(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+  const [uncertain, setUncertain] = useState(false);
+  async function inspect(event) {
+    event.preventDefault();
+    if (!file || busy) return;
+    setBusy(true); setError(''); setPreview(null); setReviewed(false); setReceipt(null); setUncertain(false);
+    try {
+      if (file.size > 2 * 1024 * 1024) throw new Error('Choose a capture file no larger than 2 MiB.');
+      const body = await file.arrayBuffer();
+      const data = await previewPendingCaptures(sessionId, body);
+      if (!/^[a-f0-9]{64}$/.test(data.file_sha256 || '')) throw new Error('The server did not return a valid file preview.');
+      setPreview({ body, data });
+    } catch (failure) { setError(failure.message || 'Unable to preview this file.'); }
+    finally { setBusy(false); }
   }
-  return String(value);
+  async function commit() {
+    if (!preview || !reviewed || busy || receipt) return;
+    setBusy(true); setError(''); setUncertain(false);
+    try { setReceipt(await importPendingCaptures(sessionId, preview.body, preview.data.file_sha256)); }
+    catch (failure) { setError(failure.message || 'Unable to import this file.'); setUncertain(!failure.status || failure.status < 400 || failure.status >= 500); }
+    finally { setBusy(false); }
+  }
+  return <section className="live-card"><h2>Import pending captures</h2><p>Preview the original capture file for this class, review its counts, then confirm the import. Captures remain pending identity and timing review and do not mark students present or absent.</p>
+    <form onSubmit={inspect}><label>Capture file<input type="file" accept=".jsonl,.ndjson,application/x-ndjson" disabled={busy || uncertain} onChange={event => { setFile(event.target.files?.[0] || null); setPreview(null); setReviewed(false); setReceipt(null); setError(''); setUncertain(false); }} /></label><button disabled={!file || busy || uncertain}>{busy ? 'Working…' : 'Preview captures'}</button></form>
+    {error && <p role="alert">{error}</p>}
+    {uncertain && <p role="status">The import outcome is not confirmed. Retry the same import to recover its receipt before choosing another file.</p>}
+    {preview && <div><p>Batch: {preview.data.batch_id}</p><p>File events: {preview.data.event_count} · New events: {preview.data.new_events} · Existing events: {preview.data.existing_events}</p>
+      {preview.data.recovery_review_required && <p>Interrupted capture recovery needs review.</p>}
+      {!receipt && <><label><span><input type="checkbox" checked={reviewed} disabled={busy} onChange={event => setReviewed(event.target.checked)} /> I have reviewed this file and class.</span></label><button onClick={commit} disabled={busy || !reviewed}>{uncertain ? 'Retry same import' : 'Confirm import'}</button></>}
+    </div>}
+    {receipt && <div role="status"><p>Import receipt: {receipt.receipt_id}</p><p>{receipt.new_events} new captures; {receipt.existing_events} already stored. {receipt.replayed ? 'Original receipt recovered.' : 'File received.'}</p><p>Pending review. Keep the original device file.</p></div>}
+  </section>;
 }
 
-function normalizeAttendanceRows(rows) {
-  if (!Array.isArray(rows) || rows.length === 0) return [];
-
-  return rows.map((row, index) => {
-    const status = String(row?.status ?? row?.record_status ?? "present");
-    const name = row?.name ?? row?.student_name ?? row?.student ?? `Student ${index + 1}`;
-    const idValue = row?.student_id ?? row?.studentId ?? row?.id ?? `${index + 1}`;
-    const department = row?.department ?? row?.session__offering_id ?? "Unassigned";
-    const time = formatTime(row?.recorded_at ?? row?.recordedAt ?? row?.time ?? row?.check_in ?? row?.created_at);
-
-    return {
-      name: typeof name === "string" ? name : String(name),
-      staffId: String(idValue),
-      department: typeof department === "string" ? department : String(department),
-      time,
-      status: status.charAt(0).toUpperCase() + status.slice(1),
-    };
-  });
+function ClassRecords({ sessionId, user }) {
+  const [page, setPage] = useState(1);
+  const detailLoad = useCallback(signal => getAttendanceSession(sessionId, signal), [sessionId]);
+  const detail = useRemote(detailLoad);
+  const load = useCallback(signal => listAttendanceRecords(sessionId, page, signal), [sessionId, page]);
+  const records = useRemote(load);
+  return <section className="live-card"><h2>Class attendance records</h2>
+    <LoadState resource={detail}>{data => <p>{data.title} · {data.status} · {time(data.starts_at)}</p>}</LoadState>
+    <LoadState resource={records}>{data => <>{data.results.length ? <div className="live-table"><table><thead><tr><th>Student ID</th><th>Status</th><th>Recorded at</th><th>Reason</th></tr></thead><tbody>{data.results.map(row => <tr key={row.id}><td>{row.student_id}</td><td>{row.status}</td><td>{time(row.recorded_at)}</td><td>{row.reason}</td></tr>)}</tbody></table></div> : <p>No attendance records have been recorded for this class.</p>}<Pager data={data} page={page} onChange={setPage} /></>}</LoadState>
+    {!detail.loading && !detail.error && hasPermission(user, 'attendance.import_pending_captures') && <PendingCaptureUpload sessionId={sessionId} />}
+  </section>;
 }
 
-function Icon({ children }) {
-  return <span className="attendance-icon" aria-hidden="true">{children}</span>;
-}
-
-function AttendanceDashboard() {
+export default function AttendanceDashboard() {
+  const { user, signOut } = useAuth();
   const navigate = useNavigate();
-  const { user, status } = useAuth();
-  const [sessionInfo, setSessionInfo] = useState(null);
-  const [attendanceSessions, setAttendanceSessions] = useState([]);
-  const [attendanceRecords, setAttendanceRecords] = useState(sampleRecords);
-  const [search, setSearch] = useState("");
-  const [loadError, setLoadError] = useState("");
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    if (!user || status !== "ready") {
-      return;
-    }
-
-    let isMounted = true;
-
-    const loadData = async () => {
-      setLoading(true);
-      setLoadError("");
-      try {
-        if (user.role === "hod") {
-          const current = await getCurrentAcademicSession().catch(() => null);
-          if (isMounted) {
-            setSessionInfo(current ?? { name: "No active session selected", academic_session: null, source: "database" });
-          }
-        }
-
-        const sessionsResponse = await listAttendanceSessions(1).catch(() => ({ results: [] }));
-        const sessions = Array.isArray(sessionsResponse)
-          ? sessionsResponse
-          : sessionsResponse?.results ?? [];
-
-        if (isMounted) {
-          setAttendanceSessions(sessions);
-        }
-
-        const response = await getMyAttendance(1).catch(() => ({ results: [] }));
-        const rows = Array.isArray(response)
-          ? response
-          : response?.results ?? [];
-        const normalized = normalizeAttendanceRows(rows);
-
-        if (isMounted) {
-          setAttendanceRecords(normalized.length > 0 ? normalized : sampleRecords);
-        }
-      } catch (error) {
-        if (isMounted) {
-          setLoadError(error.message || "Attendance data could not be loaded from the API.");
-          setAttendanceRecords(sampleRecords);
-        }
-      } finally {
-        if (isMounted) {
-          setLoading(false);
-        }
-      }
-    };
-
-    loadData();
-
-    return () => {
-      isMounted = false;
-    };
-  }, [status, user]);
-
-  const filteredRecords = useMemo(() => {
-    const query = search.trim().toLowerCase();
-    if (!query) return attendanceRecords;
-    return attendanceRecords.filter((record) =>
-      [record.name, record.staffId, record.department, record.status]
-        .some((value) => String(value).toLowerCase().includes(query)),
-    );
-  }, [attendanceRecords, search]);
-
-  const canViewDashboard = !!user && ["hod", "staff"].includes(user.role);
-
-  if (!user) {
-    return (
-      <AccessMessage
-        title="Sign in to continue"
-        message="The attendance dashboard is available only to staff and HOD accounts with active session authentication."
-      />
-    );
+  const [page, setPage] = useState(1);
+  const [selected, setSelected] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+  const load = useCallback(signal => listAttendanceSessions(page, signal), [page]);
+  const sessions = useRemote(load);
+  async function logout() {
+    if (busy) return;
+    setBusy(true); setError('');
+    try { await signOut(); navigate('/login', { replace: true }); }
+    catch (failure) { setError(failure.message || 'Unable to sign out.'); }
+    finally { setBusy(false); }
   }
-
-  if (!canViewDashboard) {
-    return (
-      <AccessMessage
-        title="Attendance access not approved"
-        message="This account is not authorized for the department attendance workspace. Sign in with a staff or HOD role to continue."
-      />
-    );
-  }
-
-  return (
-    <main className="attendance-app">
-      <aside className="attendance-sidebar">
-        <Link to="/" className="attendance-brand" aria-label="EEE OAU home">
-          <span className="attendance-brand-mark">E</span>
-          <span><strong>EEE OAU</strong><small>Attendance portal</small></span>
-        </Link>
-
-        <p className="attendance-nav-label">WORKSPACE</p>
-        <nav className="attendance-nav" aria-label="Attendance navigation">
-          <a href="#overview" className="active"><Icon>▦</Icon>Overview</a>
-          <a href="#sessions"><Icon>▤</Icon>Sessions</a>
-          <a href="#records"><Icon>◫</Icon>Attendance records</a>
-        </nav>
-
-        <div className="attendance-userbox">
-          <span className="attendance-user-label">SIGNED IN</span>
-          <strong>{user.username || user.email || "Authenticated user"}</strong>
-          <small>{user.role === "hod" ? "Head of Department" : "Staff member"}</small>
-        </div>
-
-        <button type="button" className="attendance-signout" onClick={() => navigate("/login")}>Return to login</button>
-      </aside>
-
-      <section className="attendance-main" id="overview">
-        <div className="attendance-topbar">
-          <div>
-            <p className="attendance-eyebrow">EEE OAU · STAFF ATTENDANCE</p>
-            <h1>Department attendance dashboard</h1>
-          </div>
-          <span className="attendance-status-chip">{loading ? "Syncing" : "Connected"}</span>
-        </div>
-
-        <section className="attendance-stat-grid">
-          <StatCard icon="◔" label="Current academic session" value={sessionInfo?.name || "Not selected"} detail={sessionInfo?.source ? `Source: ${sessionInfo.source}` : "Awaiting selection"} tone="blue" />
-          <StatCard icon="✓" label="Open sessions" value={String(attendanceSessions.length)} detail="Visible class records" tone="green" />
-          <StatCard icon="⌁" label="Recorded attendance" value={String(attendanceRecords.length)} detail="Recent entries" tone="orange" />
-          <StatCard icon="△" label="API status" value={loadError ? "Warning" : "Live"} detail={loadError || "Session-authenticated API ready"} tone="slate" />
-        </section>
-
-        <section className="session-panel" id="sessions">
-          <div className="records-heading">
-            <div>
-              <h2>Current session and attendance classes</h2>
-              <p>{sessionInfo?.name ? `Academic session: ${sessionInfo.name}` : "No current session has been selected yet."}</p>
-            </div>
-          </div>
-
-          <div className="attendance-session-list">
-            {attendanceSessions.length === 0 ? (
-              <p className="empty-records">No attendance sessions are visible yet. The backend will populate this list after a class is opened.</p>
-            ) : (
-              attendanceSessions.map((session, index) => (
-                <article key={session.id ?? session.session_id ?? `attendance-session-${index}`} className="attendance-session-item">
-                  <div>
-                    <strong>{session.title || session.name || "Attendance class"}</strong>
-                    <small>
-                      {session.offering ? `Offering ${session.offering}` : "Current offering"} · {session.status || "Open"}
-                    </small>
-                  </div>
-                  <span>
-                    {session.starts_at ? formatTime(session.starts_at) : "Pending start"}
-                  </span>
-                </article>
-              ))
-            )}
-          </div>
-        </section>
-
-        {loadError && <p className="scan-upload-error" role="alert">{loadError}</p>}
-
-        <section className="records-panel" id="records">
-          <div className="records-heading">
-            <div>
-              <h2>Recent attendance</h2>
-              <p>{attendanceSessions.length ? "Latest visible records from the configured attendance API." : "Using sample data until a live attendance class is available."}</p>
-            </div>
-            <label className="attendance-search">
-              <span aria-hidden="true">⌕</span>
-              <input
-                value={search}
-                onChange={(event) => setSearch(event.target.value)}
-                placeholder="Search staff..."
-                aria-label="Search attendance records"
-              />
-            </label>
-          </div>
-
-          <div className="attendance-table-wrap">
-            <table className="attendance-table">
-              <thead><tr><th>Staff member</th><th>Department</th><th>Check-in</th><th>Status</th></tr></thead>
-              <tbody>
-                {filteredRecords.map((record, index) => (
-                  <tr key={`${record.staffId}-${record.time}-${index}`}>
-                    <td><strong>{record.name}</strong><small>{record.staffId}</small></td>
-                    <td>{record.department}</td>
-                    <td>{record.time}</td>
-                    <td><span className={`record-status ${record.status.toLowerCase()}`}>{record.status}</span></td>
-                  </tr>
-                ))}
-                {filteredRecords.length === 0 && <tr><td className="empty-records" colSpan="4">No records match your search.</td></tr>}
-              </tbody>
-            </table>
-          </div>
-        </section>
-
-        <footer className="attendance-footer">EEE OAU · Attendance API integration <span>Session-authenticated backend requests use CSRF-protected Django endpoints.</span></footer>
-      </section>
-    </main>
-  );
+  return <main className="live-portal"><header className="live-heading"><div><p>EEE OAU · Student class attendance</p><h1>Class attendance</h1></div><button disabled={busy} onClick={logout}>{busy ? 'Signing out…' : 'Log out'}</button></header>
+    <Link to={workspaceHome(user)}>Return to workspace</Link>{error && <p role="alert">{error}</p>}
+    {user.role === 'hod' && <CurrentSession />}
+    <section className="live-card"><h2>Visible classes</h2><p>Select a class to view its student records. Course assignments and permissions are checked by the server.</p>
+      <LoadState resource={sessions}>{data => <>{data.results.length ? <><p>{data.results.filter(row => row.status === 'open').length} open classes on this page.</p><label>Class<select value={selected} onChange={event => setSelected(event.target.value)}><option value="">Choose a class</option>{data.results.map(row => <option key={row.id} value={row.id}>{row.title} · {row.status} · {time(row.starts_at)}</option>)}</select></label></> : <p>No attendance classes are visible to your account.</p>}<Pager data={data} page={page} onChange={value => { setPage(value); setSelected(''); }} /></>}</LoadState>
+    </section>
+    {selected && !sessions.loading && !sessions.error && <ClassRecords key={`${user.id}-${selected}`} sessionId={selected} user={user} />}
+  </main>;
 }
-
-function StatCard({ icon, label, value, detail, tone }) {
-  return (
-    <article className="attendance-stat">
-      <span className={`stat-icon ${tone}`} aria-hidden="true">{icon}</span>
-      <p>{label}</p><strong>{value}</strong><small>{detail}</small>
-    </article>
-  );
-}
-
-function AccessMessage({ title, message }) {
-  const navigate = useNavigate();
-  return (
-    <main className="attendance-gate">
-      <div className="gate-card">
-        <span className="gate-mark" aria-hidden="true">E</span>
-        <p className="attendance-eyebrow">EEE OAU · STAFF ATTENDANCE</p>
-        <h1>{title}</h1>
-        <p>{message}</p>
-        <div className="gate-actions">
-          <Link to="/login" className="gate-primary">Sign in</Link>
-          <button type="button" onClick={() => navigate("/")}>Back to home</button>
-        </div>
-        <small>Use a signed-in staff or HOD account to access the session-aware attendance API.</small>
-      </div>
-    </main>
-  );
-}
-
-export default AttendanceDashboard;

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Link, useLocation } from "react-router-dom";
+import { Link, Navigate, useLocation, useSearchParams } from "react-router-dom";
 import { toast } from "react-toastify";
 import Sectionheader from "../components/Sectionheader";
 import { requestPasswordReset } from "../api";
@@ -21,9 +21,12 @@ const notices = {
 
 export default function PortalNotice() {
   const { pathname } = useLocation();
+  const [query] = useSearchParams();
   const notice = notices[pathname];
   const [email, setEmail] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  if (pathname === '/recover-password' && (query.has('uid') || query.has('token'))) return <Navigate to={`/reset-password?${query}`} replace />;
 
   if (notice) {
     return (
