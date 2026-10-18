@@ -71,6 +71,13 @@ The plan illustrates these software folders beneath `software/`; the existing sc
 
 ## Getting started
 
+The attendance/calendar integration is documented in
+[attendance backend reconciliation](docs/attendance-reconciliation-2026-10-18.md).
+It preserves the existing document-upload app and uses one database-selected
+academic session for staff scope across the backend. Test validation uses
+isolated databases; existing database schema/data reconciliation remains a
+separate rollout step.
+
 Clone this repository and open its root in your editor. Review the scope and module boundaries before adding code.
 
 Use `python manage.py` from the repository root; `app/manage.py` remains a compatibility entry point. Imported portal code is preserved under `legacy/teammate_portal/` for later review and is not active. Follow [backend-foundation.md](docs/backend-foundation.md) for installation, configuration checks, isolated tests, API contracts, and pending database setup. Development settings still use SQLite; PostgreSQL remains the intended application database. The separate React frontend is maintained by the frontend developer.
