@@ -40,10 +40,12 @@ reset completion and built image URLs are now implemented. The existing guardian
 workflow is embedded and document uploads use the multipart API. See the
 integration document for verification and remaining prototype scope.
 
-Attendance and database current-session selection were reviewed against local
-uncommitted backend work and are not on this branch's main base. Reconcile and
-review that backend work before enabling those features. Adviser capabilities
-come from staff permissions and adviser levels, not a separate API role.
+Attendance and database current-session selection were initially reviewed
+against local uncommitted backend work. That work is now reconciled with main
+in `feat/attendance-backend` and merged locally into this frontend branch. See
+the [backend reconciliation report](attendance-reconciliation-2026-10-18.md)
+before reviewing/deploying its migrations. Adviser capabilities come from
+staff permissions and adviser levels, not a separate API role.
 
 ## Import validation
 

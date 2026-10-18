@@ -60,6 +60,13 @@ reconciliation; no such database was migrated during this work.
   with no skips**, including 14 contention cases, seven real HTTP/restart cases
   and the document regression suite. System and migration-drift checks pass.
   The runner stopped and removed its temporary cluster after success.
+- Local merge `5742524` combines this backend with `feat/frontend-portal`.
+  The combined checkout passed real HTTP checks through Vite for session/CSRF
+  login, student/class reads, raw JSONL preview/import/idempotent retry,
+  unchanged attendance marks, multipart document upload and logout. This used
+  synthetic in-memory data and the merged checkout's normal app/URL settings.
+  Frontend lint, 37 regression tests and the production build previously passed;
+  the frontend code remained unchanged through the backend merge.
 
 To reproduce the full backend checks from a configured checkout:
 

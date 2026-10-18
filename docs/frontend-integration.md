@@ -1,8 +1,11 @@
 # Frontend integration — 18 October 2026
 
 The reviewed source import is followed by compatibility fixes on
-`feat/frontend-portal`. The frontend runs under `frontend/portal/`; backend
-application files and the original backend workspace are not changed by this work.
+`feat/frontend-portal`. The frontend runs under `frontend/portal/`. Reconciled
+attendance/calendar backend changes from `feat/attendance-backend` (`15ff6db`)
+are included in local merge `5742524`. The original backend working checkout
+and its unrelated pending changes remain intact. See the
+[backend reconciliation report](attendance-reconciliation-2026-10-18.md).
 
 ## Completed
 
@@ -28,6 +31,10 @@ application files and the original backend workspace are not changed by this wor
 - Permission-gated document upload uses the existing multipart endpoint and its
   quality decision. Replacement requires an explicit user review checkbox.
 - Frontend CI installs the lockfile and runs lint, regression tests and build.
+- Attendance and database current-session selection are reconciled with the main
+  backend, retaining the document app. Account identity, student records,
+  results, guardians, export, messaging and document uploads share the selected
+  academic-session scope. Backend CI covers attendance and documents together.
 
 ## Verification
 
@@ -40,25 +47,30 @@ roles, real sign-out, reset links and validation, attendance pagination, late
 class responses, reviewed upload/retry and the preserved guardian workflow.
 
 Real HTTP verification used a loopback-only synthetic Django process with an
-in-memory SQLite database. It combined the current backend workspace's attendance
-code and this branch's existing document app **only for the isolated test**; this
-does not merge or commit the pending backend changes. Through the actual Vite
-proxy, the frontend API client passed session/CSRF login, student reads, class
-records, JSONL preview/import/exact retry with the same receipt, unchanged
-attendance-record count, multipart document upload and logout. No guardian
-messages were sent, and no development/shared database was migrated.
+in-memory SQLite database. After reconciliation, these checks passed against the
+actual merged checkout using its normal app registration and URL configuration.
+Through the actual Vite proxy, the frontend API client passed session/CSRF login,
+student reads, class records, JSONL preview/import/exact retry with the same
+receipt, unchanged attendance-record count, multipart document upload and
+logout. No guardian messages were sent, and no development/shared database was
+migrated.
+
+The reconciled backend passed **360 tests on isolated PostgreSQL 16.15 with no
+skips**, including concurrency, real HTTP/restart and document regression cases.
+The frontend code is unchanged from its validated revision; both backend and
+frontend were checked against their tested commits after the merge.
 
 In-app browser checks verified HOD and student login, rejection of a student's
 HOD URL, live student profiles and upload entry point, embedded guardian catalog,
 class selection/records and real logout followed by private-route rejection.
-Synthetic data only was used. This does not validate production providers,
-PostgreSQL concurrency, physical devices or institutional operation.
+Synthetic data only was used. These browser and HTTP checks do not validate
+production providers, physical devices or institutional operation.
 
 ## Dependencies before release
 
-1. Reconcile and review the pending attendance/current-session backend additions
-   with `main` while preserving the document app. The frontend branch by itself
-   does not contain those backend changes.
+1. Review the reconciled backend and frontend branch together. Approve the
+   schema/data reconciliation for the target database before applying academic
+   migration `0006` and attendance migrations `0001`–`0003` there.
 2. Configure the real backend origin, hosts/CSRF, HTTPS, reset email URL and SMTP;
    deploy the guardian worker/provider separately when delivery is intended.
 3. Implement the remaining academic editing/administration, messaging and other

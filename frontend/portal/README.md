@@ -68,10 +68,13 @@ invented document list/download endpoint.
 
 ## Backend requirements and remaining scope
 
-The main base includes academic, account, guardian and document APIs. Attendance
-and database current-session selection still require the separately reviewed
-backend changes currently in the backend workspace. A missing or denied endpoint
-is displayed as an error/empty state; it is never filled with sample records.
+This branch includes academic, account, guardian and document APIs together with
+the reconciled attendance and database current-session backend from
+`feat/attendance-backend`. See the
+[backend reconciliation report](../../docs/attendance-reconciliation-2026-10-18.md)
+for migrations, permissions and validation. Review the target database's schema
+and data before applying those migrations. A missing or denied endpoint is
+displayed as an error/empty state; it is never filled with sample records.
 
 Academic editing, catalog administration, messages, course registration,
 timetables, appointments and the other prototype workflows still need dedicated
