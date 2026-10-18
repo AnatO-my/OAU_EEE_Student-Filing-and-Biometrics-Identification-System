@@ -1,3 +1,4 @@
+from academics.session_context import current_session_name
 from django.conf import settings
 from django.core.exceptions import PermissionDenied
 from django.db import transaction
@@ -9,6 +10,7 @@ from .eligibility import validate_graduation_cgpa
 from .models import Guardian, Student
 
 
+# Return only active-session students visible under the user's staff role.
 def students_visible_to(user, academic_session):
     students = Student.objects.all()
 
@@ -32,6 +34,7 @@ def students_visible_to(user, academic_session):
     return students.filter(current_level__in=assigned_levels)
 
 
+# Create a student after checking staff rights, adviser scope, and graduation eligibility.
 @transaction.atomic
 def create_student(*, user, validated_data):
     if not user.is_authenticated or not user.is_active or not user.is_staff:
@@ -46,7 +49,7 @@ def create_student(*, user, validated_data):
     )
 
     if not user.is_superuser:
-        academic_session = settings.CURRENT_ACADEMIC_SESSION
+        academic_session = current_session_name()
 
         if not academic_session:
             raise PermissionDenied("The current academic session is not configured.")
@@ -75,6 +78,7 @@ def create_student(*, user, validated_data):
     return Student.objects.create(**validated_data)
 
 
+# Update a locked student record while enforcing adviser and HOD boundaries.
 @transaction.atomic
 def update_student(*, user, student, validated_data):
     if not user.is_authenticated or not user.is_active or not user.is_staff:
@@ -106,7 +110,7 @@ def update_student(*, user, student, validated_data):
         if target_level != student.current_level:
             raise PermissionDenied("Only the HOD may change a student's level.")
 
-        academic_session = settings.CURRENT_ACADEMIC_SESSION
+        academic_session = current_session_name()
 
         if not academic_session:
             raise PermissionDenied("The current academic session is not configured.")
@@ -148,6 +152,7 @@ def update_student(*, user, student, validated_data):
     return student
 
 
+# Apply a level change atomically after validating HOD authority and every selection.
 @transaction.atomic
 def bulk_change_student_levels(*, user, validated_data):
     if (
@@ -198,6 +203,7 @@ def bulk_change_student_levels(*, user, validated_data):
     return len(students)
 
 
+# Apply an academic-status change atomically after validating eligibility.
 @transaction.atomic
 def bulk_change_student_statuses(*, user, validated_data):
     if (
@@ -260,6 +266,7 @@ def bulk_change_student_statuses(*, user, validated_data):
     return len(students)
 
 
+# Require guardian permissions and, for advisers, a current matching assignment.
 def require_guardian_access(user, student, action):
     if not (user.is_authenticated and user.is_active and user.is_staff
             and user.has_perm("students.view_student")
@@ -267,13 +274,15 @@ def require_guardian_access(user, student, action):
             and user.has_perm("students." + action)):
         raise PermissionDenied("You do not have permission for this guardian action.")
     if not user.is_superuser:
-        if not settings.CURRENT_ACADEMIC_SESSION or not AdviserAssignment.objects.select_for_update().filter(
-            staff=user, academic_session=settings.CURRENT_ACADEMIC_SESSION,
+        session = current_session_name()
+        if not session or not AdviserAssignment.objects.select_for_update().filter(
+            staff=user, academic_session=session,
             level=student.current_level, is_active=True,
         ).exists():
             raise PermissionDenied("The student is outside your adviser assignment.")
 
 
+# Create a validated guardian while locking its student against concurrent edits.
 @transaction.atomic
 def create_guardian(*, user, student, validated_data):
     student = Student.objects.select_for_update().get(pk=student.pk)
@@ -285,6 +294,7 @@ def create_guardian(*, user, student, validated_data):
     return guardian
 
 
+# Update allowed guardian contact fields while preserving the student relationship.
 @transaction.atomic
 def update_guardian(*, user, guardian, validated_data):
     student = Student.objects.select_for_update().get(pk=guardian.student_id)

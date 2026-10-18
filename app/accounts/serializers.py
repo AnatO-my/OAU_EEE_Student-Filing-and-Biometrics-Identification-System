@@ -1,3 +1,4 @@
+from academics.session_context import current_session_name
 from django.core.exceptions import ObjectDoesNotExist
 from django.contrib.auth import authenticate, get_user_model
 from rest_framework import serializers
@@ -5,6 +6,7 @@ from rest_framework import serializers
 from .models import AdviserMessage, HODMessage
 
 
+# Validate credentials and restrict API sign-in to accounts with an API role.
 class LoginSerializer(serializers.Serializer):
     #class for validating the credentials posted by a staff member or a student, the
     #password is write only so it can never be read back out of a serialised
@@ -16,6 +18,7 @@ class LoginSerializer(serializers.Serializer):
         style={"input_type": "password"},
     )
 
+    # Decide whether this account has the staff role or a linked student profile.
     #method that reports whether an account is allowed to sign in to the JSON API, a
     #staff account may always sign in and a student account must be linked to a student
     #profile so an account with no role cannot reach the API at all
@@ -30,6 +33,7 @@ class LoginSerializer(serializers.Serializer):
 
         return True
 
+    # Authenticate credentials and return one uniform rejection for ineligible users.
     #method that checks the credentials and rejects anything that is not an account
     #allowed to use the API
     def validate(self, attrs):
@@ -52,21 +56,27 @@ class LoginSerializer(serializers.Serializer):
         return attrs
 
 
+# Expose the signed-in user's safe identity, role, permissions, and current adviser levels.
 class CurrentUserSerializer(serializers.ModelSerializer):
     permissions = serializers.SerializerMethodField()
     adviser_levels = serializers.SerializerMethodField()
     role = serializers.SerializerMethodField()
 
+    # Return effective permissions only while the account remains active.
     def get_permissions(self, user):
         return sorted(user.get_all_permissions()) if user.is_active else []
 
+    # List distinct active adviser levels for the configured academic session.
     def get_adviser_levels(self, user):
-        from django.conf import settings
-        if not settings.CURRENT_ACADEMIC_SESSION or not user.is_active or not user.is_staff:
+        if not user.is_active or not user.is_staff:
             return []
-        return list(user.adviser_assignments.filter(academic_session=settings.CURRENT_ACADEMIC_SESSION,
+        session = current_session_name()
+        if not session:
+            return []
+        return list(user.adviser_assignments.filter(academic_session=session,
             is_active=True).order_by("level").values_list("level", flat=True).distinct())
 
+    # Map account flags to the frontend's HOD, staff, or student role.
     def get_role(self, user):
         return "hod" if user.is_staff and user.is_superuser else "staff" if user.is_staff else "student"
 
@@ -92,6 +102,7 @@ class CurrentUserSerializer(serializers.ModelSerializer):
         read_only_fields = fields
 
 
+# Check that the chosen adviser-message audience has exactly the required target.
 class AdviserMessageSendSerializer(serializers.Serializer):
 
     assignment_id = serializers.IntegerField(min_value=1)
@@ -102,6 +113,7 @@ class AdviserMessageSendSerializer(serializers.Serializer):
     body = serializers.CharField()
     recipient_id = serializers.UUIDField(required=False)
 
+    # Require an individual student ID and reject target IDs for level notices.
     def validate(self, attrs):
         audience = attrs["audience"]
         recipient_id = attrs.get("recipient_id")
@@ -125,6 +137,7 @@ class AdviserMessageSendSerializer(serializers.Serializer):
         return attrs
 
 
+# Serialize an adviser message visible to one of its student recipients.
 class StudentMessageSerializer(serializers.ModelSerializer):
     sender_name = serializers.SerializerMethodField()
 
@@ -140,11 +153,13 @@ class StudentMessageSerializer(serializers.ModelSerializer):
         ]
         read_only_fields = fields
 
+    # Prefer the sender's full name, falling back to their username.
     def get_sender_name(self, obj):
         sender = obj.assignment.staff
         return sender.get_full_name() or sender.username
 
 
+# Validate audience-specific target fields for messages sent by the HOD.
 class HODMessageSendSerializer(serializers.Serializer):
     audience = serializers.ChoiceField(choices=HODMessage.Audience.choices)
     subject = serializers.CharField(max_length=200)
@@ -153,6 +168,7 @@ class HODMessageSendSerializer(serializers.Serializer):
     adviser_id = serializers.IntegerField(min_value=1, required=False)
     level = serializers.IntegerField(min_value=1, max_value=32767, required=False)
 
+    # Require exactly the field associated with the selected audience.
     def validate(self, attrs):
         target_field = {
             HODMessage.Audience.INDIVIDUAL: "recipient_id",
@@ -167,6 +183,7 @@ class HODMessageSendSerializer(serializers.Serializer):
         return attrs
 
 
+# Serialize an HOD message without exposing its internal recipient relations.
 class HODInboxSerializer(serializers.ModelSerializer):
     sender_name = serializers.SerializerMethodField()
 
@@ -175,30 +192,36 @@ class HODInboxSerializer(serializers.ModelSerializer):
         fields = ["id", "audience", "subject", "body", "sender_name", "created_at"]
         read_only_fields = fields
 
+    # Prefer the sender's full name, falling back to their username.
     def get_sender_name(self, obj):
         return obj.sender.get_full_name() or obj.sender.username
 
 
+# Accept the current and replacement credentials for an authenticated password change.
 class PasswordChangeSerializer(serializers.Serializer):
     current_password = serializers.CharField(write_only=True, trim_whitespace=False)
     new_password = serializers.CharField(write_only=True, trim_whitespace=False)
 
 
+# Validate the email address used to request a password-reset link.
 class PasswordResetRequestSerializer(serializers.Serializer):
     email = serializers.EmailField()
 
 
+# Accept the user identifier, reset token, and replacement password.
 class PasswordResetConfirmSerializer(serializers.Serializer):
     uid = serializers.CharField()
     token = serializers.CharField()
     new_password = serializers.CharField(write_only=True, trim_whitespace=False)
 
 
+# Validate the details needed to create a least-privilege student account.
 class StudentAccountCreateSerializer(serializers.Serializer):
     username = serializers.CharField(max_length=150)
     email = serializers.EmailField()
     password = serializers.CharField(write_only=True, trim_whitespace=False)
 
 
+# Require the ID of an existing account to link to a student profile.
 class StudentAccountLinkSerializer(serializers.Serializer):
     account_id = serializers.IntegerField(min_value=1)

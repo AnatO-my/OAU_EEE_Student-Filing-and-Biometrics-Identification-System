@@ -11,6 +11,7 @@ from .serializers import DocumentUploadSerializer, StudentDocumentSerializer
 
 from students.permissions import StudentModelPermissions
 from students.services import students_visible_to
+from academics.session_context import current_session_name
 
 
 class StudentDocumentView(APIView):
@@ -20,7 +21,7 @@ class StudentDocumentView(APIView):
 
     def post(self, request, student_id):
         student = get_object_or_404(
-            students_visible_to(request.user, settings.CURRENT_ACADEMIC_SESSION), 
+            students_visible_to(request.user, current_session_name()),
             student_id=student_id)
 
         form = DocumentUploadSerializer(data=request.data)

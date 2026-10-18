@@ -25,4 +25,5 @@ urlpatterns = [
     path("api/", include("accounts.message_urls")),
     path("api/", include("documents.urls")),
     path("api/", include("academics.urls")),
+    path("api/", include("attendance.urls")),
 ]
