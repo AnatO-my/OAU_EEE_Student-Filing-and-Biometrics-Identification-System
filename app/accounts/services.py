@@ -1,3 +1,4 @@
+from academics.session_context import current_session_name
 from django.conf import settings
 from django.core.exceptions import PermissionDenied
 from django.db import transaction
@@ -8,6 +9,8 @@ from students.models import Student
 from .models import AdviserAssignment
 from .models import AdviserMessage
 
+
+# Resolve and lock the caller's active, permitted assignment for the current session.
 def get_message_assignment(*, user, assignment_id):
     if (
         not user.is_authenticated
@@ -19,7 +22,7 @@ def get_message_assignment(*, user, assignment_id):
     if not user.has_perm("accounts.send_adviser_message"):
         raise PermissionDenied("You do not have permission to send messages.")
 
-    academic_session = settings.CURRENT_ACADEMIC_SESSION
+    academic_session = current_session_name()
     if not academic_session:
         raise PermissionDenied("The current academic session is not configured.")
 
@@ -38,6 +41,7 @@ def get_message_assignment(*, user, assignment_id):
     return assignment
 
 
+# Save an adviser message and snapshot its active recipients for the assigned level.
 @transaction.atomic
 def send_adviser_message(*, user, validated_data):
     assignment = get_message_assignment(
@@ -89,6 +93,8 @@ def send_adviser_message(*, user, validated_data):
 
     return message
 
+
+# Save an HOD message after resolving and locking the requested eligible recipients.
 @transaction.atomic
 def send_hod_message(*, user, validated_data):
     from django.contrib.auth import get_user_model
@@ -96,7 +102,7 @@ def send_hod_message(*, user, validated_data):
 
     if not user.is_authenticated or not user.is_active or not user.is_staff or not user.is_superuser:
         raise PermissionDenied("Only the active HOD superuser may send HOD messages.")
-    session = settings.CURRENT_ACADEMIC_SESSION
+    session = current_session_name()
     if not session:
         raise PermissionDenied("The current academic session is not configured.")
 
