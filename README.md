@@ -105,6 +105,10 @@ Use `python manage.py` from the repository root; `app/manage.py` remains a compa
 
 Before implementing document storage, agree file categories, reference numbers, permitted file types and sizes, upload/download permissions, revision and correction history, retention and archive rules, and backup recovery. Use private storage with server-side access checks; define validation and malware scanning before accepting uploaded documents.
 
+## List of Contributors
+- faheezah
+- AnatO-my
+
 ## Contributing
 
 Read [CONTRIBUTING.md](CONTRIBUTING.md) for branch, review, validation, and data-handling rules. Use a branch for each focused change and submit a pull request describing the behaviour, validation performed, and any unresolved decisions. Keep documentation and contracts aligned with implementation. Changes to academic rules, access policies, and data-source assumptions require review by the appropriate project or departmental owner.
