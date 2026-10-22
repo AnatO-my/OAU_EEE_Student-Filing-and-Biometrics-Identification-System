@@ -1,0 +1,5 @@
+.student-password-setup h1{margin:0 0 1rem;font-size:1.75rem;font-weight:700;line-height:1.2;letter-spacing:-.025em;color:#172d48}
+.student-password-setup .live-card{min-width:0;overflow-wrap:anywhere}
+.student-password-setup .live-form{grid-template-columns:minmax(0,1fr);max-width:100%;min-width:0}
+.student-password-setup .live-form label,.student-password-setup input{min-width:0;max-width:100%}
+@media(max-width:560px){.student-password-setup h1{font-size:1.5rem}.student-password-setup{padding:28px 14px}}

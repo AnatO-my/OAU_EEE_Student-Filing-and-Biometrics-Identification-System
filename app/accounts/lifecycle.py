@@ -17,6 +17,7 @@ from academics.services import require_hod
 from .serializers import LoginSerializer
 
 
+# Parse and validate the configured frontend URL used in reset links.
 def reset_frontend_url():
     url = getattr(settings, "PASSWORD_RESET_FRONTEND_URL", "")
     parsed = urlsplit(url)
@@ -27,6 +28,7 @@ def reset_frontend_url():
     return parsed
 
 
+# Send reset instructions to eligible active accounts without exposing account lookup results.
 def request_password_reset(*, email):
     parsed = reset_frontend_url()
     User = get_user_model()
@@ -45,6 +47,7 @@ def request_password_reset(*, email):
             logging.getLogger(__name__).warning("Password-reset email could not be delivered.")
 
 
+# Validate a one-time reset token and atomically replace the account password.
 @transaction.atomic
 def confirm_password_reset(*, uid, token, new_password):
     User = get_user_model()
@@ -61,6 +64,7 @@ def confirm_password_reset(*, uid, token, new_password):
     return user
 
 
+# Verify the current credential and change the password while holding the account row lock.
 @transaction.atomic
 def change_password(*, user, current_password, new_password):
     user = get_user_model().objects.select_for_update().get(pk=user.pk, is_active=True)
@@ -72,9 +76,11 @@ def change_password(*, user, current_password, new_password):
     return user
 
 
+# Create a student login and link it to the profile in one HOD-authorized transaction.
 @transaction.atomic
 def provision_student_account(*, user, student, validated_data):
-    require_hod(user)
+    from .administration import locked_users
+    user, _ = locked_users(user)
     student = Student.objects.select_for_update().get(pk=student.pk)
     if student.user_id is not None:
         raise ValidationError("This student already has an account.")
@@ -90,13 +96,14 @@ def provision_student_account(*, user, student, validated_data):
     return account
 
 
+# Link an eligible existing nonstaff account to a student profile.
 @transaction.atomic
 def link_student_account(*, user, student, account_id):
-    require_hod(user)
+    from .administration import locked_users
+    user, accounts = locked_users(user, account_id)
     student = Student.objects.select_for_update().get(pk=student.pk)
-    try:
-        account = get_user_model().objects.select_for_update().get(pk=account_id)
-    except get_user_model().DoesNotExist:
+    account = accounts.get(account_id)
+    if account is None:
         raise ValidationError("Select an existing account.")
     if student.user_id is not None:
         raise ValidationError("This student already has an account.")

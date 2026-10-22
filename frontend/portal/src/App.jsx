@@ -7,16 +7,18 @@ import { ToastContainer } from "react-toastify";
 import Register from "./pages/Register";
 import PortalNotice from "./pages/PortalNotice";
 import InformationPage from "./pages/InformationPage";
-import Admindashboard from "./pages/Admindashboard";
-import Studentprofile from "./pages/Studentprofile";
 import { AuthProvider } from "./auth/AuthContext";
-import RequireAuth from './auth/RequireAuth';
 import ResetPassword from './pages/ResetPassword';
-import './live.css';
+import SetupStudent from './pages/SetupStudent';
+import { useAuth } from './auth/useAuth';
 
-const DemoPortal = lazy(() => import("./pages/Portal"));
-const LivePortal = lazy(() => import('./pages/LivePortal'));
-const AttendanceDashboard = lazy(() => import('./pages/AttendanceDashboard'));
+const Portal = lazy(() => import("./live/LivePortal"));
+
+function PortalRedirect({ section = 'dashboard' }) {
+  const { user, status } = useAuth();
+  if (status === 'loading') return <p role="status">Checking your session…</p>;
+  return <Navigate to={user ? `/portal/${user.role}/${section}` : '/login'} replace />;
+}
 
 function App() {
   return (
@@ -27,17 +29,17 @@ function App() {
             <Routes>
               <Route path="/" element={<AppLayout />}>
                 <Route index element={<Landing />} />
-                <Route path="admin" element={<Admindashboard />} />
-                <Route path="attendance" element={<RequireAuth staff permission="attendance.view_attendance"><AttendanceDashboard /></RequireAuth>} />
-                <Route path="guardian-results/*" element={<Navigate to="/portal/hod/guardian-results" replace />} />
-                <Route path="student" element={<Studentprofile />} />
-                <Route path="student/profile" element={<Navigate to="/portal/student/profile" replace />} />
-                <Route path="portal/:role/:section?" element={<RequireAuth><LivePortal /></RequireAuth>} />
-                <Route path="demo/:role/:section?" element={<DemoPortal />} />
+                <Route path="attendance" element={<PortalRedirect section="attendance" />} />
+                <Route path="portal" element={<PortalRedirect />} />
+                <Route path="guardian-results" element={<PortalRedirect section="guardian-results" />} />
+                <Route path="student" element={<PortalRedirect />} />
+                <Route path="student/profile" element={<PortalRedirect section="profile" />} />
+                <Route path="portal/:role/:section?" element={<Portal />} />
                 <Route path="login" element={<Login />} />
                 <Route path="register" element={<Register />} />
                 <Route path="recover-password" element={<PortalNotice />} />
                 <Route path="reset-password" element={<ResetPassword />} />
+                <Route path="setup-student" element={<SetupStudent />} />
                 <Route path="session-expired" element={<PortalNotice />} />
                 <Route path="access-denied" element={<PortalNotice />} />
                 <Route path="help" element={<InformationPage />} />

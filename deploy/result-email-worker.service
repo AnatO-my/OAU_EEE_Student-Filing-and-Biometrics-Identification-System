@@ -1,0 +1,24 @@
+[Unit]
+Description=EEE guardian result email worker
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=simple
+User=eee-result-worker
+WorkingDirectory=/srv/eee
+EnvironmentFile=/etc/eee/result-email-worker.env
+Environment=PYTHONUNBUFFERED=1
+Environment=PYTHONDONTWRITEBYTECODE=1
+ExecStart=/srv/eee/.venv/bin/python manage.py process_result_shares --settings=config.postgres_settings --channel email --watch --interval 5 --limit 25
+Restart=on-failure
+RestartSec=10
+KillSignal=SIGTERM
+TimeoutStopSec=90
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+
+[Install]
+WantedBy=multi-user.target

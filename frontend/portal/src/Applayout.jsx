@@ -5,7 +5,7 @@ import Footer from "./components/Footer";
 const AppLayout = () => {
   const { pathname } = useLocation();
 
-  if (pathname === "/attendance") {
+  if (pathname === "/attendance" || pathname.startsWith('/portal') || pathname.startsWith('/guardian-results')) {
     return <Outlet />;
   }
 

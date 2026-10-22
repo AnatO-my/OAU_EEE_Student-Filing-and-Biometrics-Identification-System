@@ -107,18 +107,32 @@ def send_hod_message(*, user, validated_data):
         raise PermissionDenied("The current academic session is not configured.")
 
     audience = validated_data["audience"]
+    user_ids = {user.pk}
+    if audience == HODMessage.Audience.ADVISER:
+        target_id = validated_data.get("adviser_id")
+        if not isinstance(target_id, int) or target_id < 1:
+            raise ValidationError({"adviser_id": "Select an existing adviser account."})
+        user_ids.add(target_id)
+    # User rows precede student/assignment locks throughout this function. The
+    # sender lock also prevents a late FK key-share wait from reversing that
+    # order while an ownership transfer is waiting for another participant.
+    accounts = {account.pk: account for account in get_user_model().objects.select_for_update().filter(
+        pk__in=user_ids).order_by("pk")}
+    sender = accounts.get(user.pk)
+    if sender is None or not sender.is_active or not sender.is_staff or not sender.is_superuser:
+        raise PermissionDenied("Only the active HOD superuser may send HOD messages.")
+    user = sender
     students, advisers = [], []
     if audience == HODMessage.Audience.ADVISER:
         target = validated_data.get("adviser_id")
         if target is None or any(k in validated_data for k in ["recipient_id", "level"]):
             raise ValidationError({"adviser_id": "Provide only adviser_id for this audience."})
+        adviser = accounts.get(target)
         assignments = list(AdviserAssignment.objects.select_for_update().filter(
             staff_id=target, academic_session=session, is_active=True,
         ).order_by("pk"))
-        if assignments:
-            advisers = list(get_user_model().objects.select_for_update().filter(
-                pk=target, is_staff=True, is_active=True,
-            ))
+        if assignments and adviser is not None and adviser.is_staff and adviser.is_active:
+            advisers = [adviser]
     elif audience == HODMessage.Audience.INDIVIDUAL:
         target = validated_data.get("recipient_id")
         if target is None or any(k in validated_data for k in ["adviser_id", "level"]):

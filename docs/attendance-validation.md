@@ -1,9 +1,5 @@
 # Attendance import validation - 16 October 2026
 
-For the reconciliation with the document app and current `main`, see the
-[18 October reconciliation](attendance-reconciliation-2026-10-18.md). This file
-retains the earlier checkpoint and its historical test count.
-
 This checkpoint adds PostgreSQL contention tests and loopback HTTP integration
 tests for pending capture imports. All fixtures are synthetic. The scanner,
 gallery, saved probes, recovery backup and shared/development databases are

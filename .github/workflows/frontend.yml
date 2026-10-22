@@ -3,10 +3,12 @@ on:
   push:
     paths:
       - 'frontend/portal/**'
+      - 'frontend/guardian-results/**'
       - '.github/workflows/frontend.yml'
   pull_request:
     paths:
       - 'frontend/portal/**'
+      - 'frontend/guardian-results/**'
       - '.github/workflows/frontend.yml'
 permissions:
   contents: read

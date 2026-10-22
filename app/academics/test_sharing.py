@@ -25,7 +25,9 @@ from .sharing_worker import process_next
     WHATSAPP_ACCESS_TOKEN="synthetic-token", WHATSAPP_PHONE_NUMBER_ID="12345",
     WHATSAPP_API_VERSION="v99.0", WHATSAPP_RESULT_TEMPLATE="synthetic_report",
     WHATSAPP_TEMPLATE_LANGUAGE="en_US")
+# Exercise preview, consent, provider, queue, retry, and delivery-safety behavior.
 class ResultSharingTests(APITestCase):
+    # Prepare a verified result, consenting guardian, HOD client, and reusable preview request.
     def setUp(self):
         fixtures.ResultCreateAPITests.setUp(self)
         Result.objects.create(student=self.student, offering=self.offering,
@@ -38,18 +40,22 @@ class ResultSharingTests(APITestCase):
             "academic_session": self.offering.academic_session_id, "semester": "harmattan",
             "channels": ["email", "whatsapp"]}
 
+    # Record explicit test consent for both guardian delivery channels.
     def enable(self, guardian):
         return set_preference(user=self.hod, guardian=guardian, email_enabled=True,
             whatsapp_enabled=True, evidence="Synthetic recipient authorization and WhatsApp opt-in.")
 
+    # Submit a preview request using the shared payload unless a case supplies its own.
     def preview(self, payload=None):
         return self.client.post(reverse("result-share-preview"), payload or self.payload, format="json")
 
+    # Queue a preview using its returned digest unless batch data is supplied directly.
     def queue(self, data=None):
         data = data or self.preview().data
         return self.client.post(reverse("result-share-send", kwargs={"batch_id": data["id"]}),
             {"expected_digest": data["history_digest"]}, format="json")
 
+    # Include only verified selected-period results in previews and do not send immediately.
     def test_preview_has_only_verified_selected_report_and_no_send(self):
         response = self.preview()
         self.assertEqual(response.status_code, 201)
@@ -61,6 +67,7 @@ class ResultSharingTests(APITestCase):
         self.assertEqual(len(mail.outbox), 0)
         self.assertIn("no-store", response["Cache-Control"])
 
+    # Reuse an identical request ID but reject a conflicting request payload.
     def test_preview_idempotency_and_conflicting_request(self):
         first, second = self.preview(), self.preview()
         self.assertEqual(first.data["id"], second.data["id"])
@@ -69,6 +76,7 @@ class ResultSharingTests(APITestCase):
         changed = {**self.payload, "channels": ["email"]}
         self.assertEqual(self.preview(changed).status_code, 400)
 
+    # Ensure repeated queue requests and worker runs do not send an accepted delivery twice.
     def test_queue_repeat_click_does_not_resend(self):
         data = self.preview().data
         self.assertEqual(self.queue(data).status_code, 202)
@@ -84,6 +92,7 @@ class ResultSharingTests(APITestCase):
         self.assertIsNone(process_next())
         self.assertEqual(len(mail.outbox), 1)
 
+    # Deny preview, queue, detail, retry, and preference operations to non-HOD users.
     def test_non_hod_cannot_use_any_endpoint(self):
         data = self.preview().data
         for user in (self.staff, None):
@@ -98,6 +107,7 @@ class ResultSharingTests(APITestCase):
                 "student_id": self.student.pk, "guardian_id": self.guardian.pk}),
                 {"email_enabled": True, "whatsapp_enabled": True, "evidence": "x"}, format="json").status_code, 403)
 
+    # Mark reports without verified selected results as skipped and block queueing.
     def test_missing_or_unverified_results_block_student(self):
         Result.objects.update(is_verified=False)
         response = self.preview()
@@ -105,6 +115,7 @@ class ResultSharingTests(APITestCase):
         self.assertIsNone(response.data["preview"][0]["report"])
         self.assertEqual(self.queue(response.data).status_code, 400)
 
+    # Do not omit unverified earlier results from the cumulative report calculation.
     def test_unverified_previous_results_not_silently_omitted(self):
         old = AcademicSession.objects.create(name="2025/2026")
         offering = CourseOffering.objects.create(course=self.offering.course, academic_session=old,
@@ -113,6 +124,7 @@ class ResultSharingTests(APITestCase):
             score=Decimal("30"), credit_units=3, is_verified=False)
         self.assertIsNone(self.preview().data["preview"][0]["report"])
 
+    # Count failed attempts in cumulative averages while excluding future periods.
     def test_cgpa_counts_failed_attempts_and_excludes_future(self):
         Result.objects.create(student=self.student, offering=self.offering, attempt_number=2,
             score=Decimal("0"), credit_units=3, is_verified=True)
@@ -124,6 +136,7 @@ class ResultSharingTests(APITestCase):
         self.assertEqual(report["cgpa"], "2")
         self.assertEqual(len(report["records"]), 2)
 
+    # Surface invalid email and local-only phone values as recipient diagnostics.
     def test_contact_and_permission_diagnostics(self):
         self.guardian.phone_number = "08000000000"
         self.guardian.email = ""
@@ -132,6 +145,7 @@ class ResultSharingTests(APITestCase):
         reasons = {r["diagnostic_code"] for r in response.data["preview"][0]["recipients"]}
         self.assertEqual(reasons, {"invalid_email", "international_phone_required"})
 
+    # Default sharing permissions to off and expose students who have no guardians.
     def test_sharing_defaults_off_and_missing_guardians_visible(self):
         GuardianSharingPreference.objects.all().delete()
         response = self.preview()
@@ -144,6 +158,7 @@ class ResultSharingTests(APITestCase):
         self.assertEqual(data["preview"][0]["diagnostic_code"], "results_missing_or_unverified")
         self.assertEqual(data["preview"][0]["recipients"], [])
 
+    # Prevent duplicate guardian contact details from producing duplicate sends.
     def test_duplicate_guardian_contact_not_resent(self):
         duplicate = Guardian.objects.create(student=self.student, full_name="Same contact",
             relationship="Guardian", phone_number=self.guardian.phone_number, email=self.guardian.email)
@@ -153,6 +168,7 @@ class ResultSharingTests(APITestCase):
         self.assertEqual(sum(r["diagnostic_code"] == "duplicate_contact"
             for r in data["preview"][0]["recipients"]), 2)
 
+    # Keep each student's report limited to that student's recipients and result data.
     def test_independent_student_reports_and_email_recipient_isolation(self):
         other = Student.objects.create(identifier_type="utme", identifier_value="00999",
             full_name="Other Student", phone_number="000", admission_year=2024,
@@ -172,6 +188,7 @@ class ResultSharingTests(APITestCase):
         self.assertNotIn("Other Student", messages[self.guardian.email])
         self.assertNotIn("Example Student", messages[guardian.email])
 
+    # Reject a queued preview if academic results or guardian contact data changed.
     def test_stale_preview_rejects_result_and_contact_changes(self):
         data = self.preview().data
         Result.objects.update(score=Decimal("70"))
@@ -179,6 +196,7 @@ class ResultSharingTests(APITestCase):
         self.assertFalse(ResultShareDelivery.objects.filter(status="queued").exists())
         self.assertEqual(len(mail.outbox), 0)
 
+    # Cancel already queued delivery when the guardian withdraws channel permission.
     def test_revocation_after_queue_cancels_without_send(self):
         self.assertEqual(self.queue().status_code, 202)
         set_preference(user=self.hod, guardian=self.guardian, email_enabled=False,
@@ -190,6 +208,7 @@ class ResultSharingTests(APITestCase):
         self.assertEqual(len(mail.outbox), 0)
         self.assertEqual(ResultShareDelivery.objects.filter(status="cancelled").count(), 2)
 
+    # Refuse queueing when delivery is disabled or WhatsApp provider settings are incomplete.
     def test_unconfigured_provider_prevents_queue(self):
         with override_settings(WHATSAPP_ACCESS_TOKEN=""):
             self.assertEqual(self.queue().status_code, 400)
@@ -197,6 +216,7 @@ class ResultSharingTests(APITestCase):
         with override_settings(RESULT_SHARING_ENABLED=False):
             self.assertEqual(self.queue().status_code, 400)
 
+    # Retry a definitively rejected delivery without resending an accepted channel.
     def test_known_rejection_retries_without_resending_accepted(self):
         data = self.preview().data
         self.queue(data)
@@ -213,6 +233,7 @@ class ResultSharingTests(APITestCase):
         self.assertEqual(failed.status, "accepted")
         self.assertEqual(failed.attempts, 2)
 
+    # Keep uncertain and stranded processing submissions out of automatic retry.
     def test_unknown_and_processing_are_never_automatically_retried(self):
         data = self.preview().data
         self.queue(data)
@@ -225,12 +246,14 @@ class ResultSharingTests(APITestCase):
         ResultShareDelivery.objects.filter(status="unknown").update(status="processing")
         self.assertIsNone(process_next())
 
+    # Enforce the retry attempt cap for definitively failed deliveries.
     def test_retry_limit(self):
         data = self.preview().data
         ResultShareDelivery.objects.filter(channel="whatsapp").update(status="failed", attempts=3)
         retry = reverse("result-share-retry", kwargs={"batch_id": data["id"]})
         self.assertEqual(self.client.post(retry).data["requeued"], 0)
 
+    # Require preference evidence and ensure guardian lookup remains within its student.
     def test_preferences_record_evidence_and_parent_scope(self):
         url = reverse("guardian-result-sharing", kwargs={"student_id": self.student.pk,
                                                         "guardian_id": self.guardian.pk})
@@ -240,6 +263,7 @@ class ResultSharingTests(APITestCase):
                                                           "guardian_id": self.guardian.pk})
         self.assertEqual(self.client.get(wrong).status_code, 404)
 
+    # Require CSRF validation for session-authenticated HOD queue operations.
     def test_csrf_required_for_hod_queue(self):
         self.hod.set_password("SyntheticStrongPassword2026!")
         self.hod.save()
@@ -248,11 +272,23 @@ class ResultSharingTests(APITestCase):
         self.assertEqual(client.post(reverse("result-share-preview"), self.payload,
                                     format="json").status_code, 403)
 
+    # Confirm the management command processes queued submissions without sending drafts.
     def test_worker_command_processes_only_queue(self):
         self.preview()
         call_command("process_result_shares", limit=1, stdout=io.StringIO())
         self.assertEqual(len(mail.outbox), 0)
 
+    def test_email_only_worker_leaves_whatsapp_deliveries_queued(self):
+        self.queue()
+        with patch("academics.sharing_worker.submit_whatsapp") as whatsapp:
+            self.assertTrue(process_next(channel="email"))
+            self.assertIsNone(process_next(channel="email"))
+        whatsapp.assert_not_called()
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertEqual(ResultShareDelivery.objects.get(channel="email").status, "accepted")
+        self.assertEqual(ResultShareDelivery.objects.get(channel="whatsapp").status, "queued")
+
+    # Verify WhatsApp template parameters use the international number and report body.
     def test_whatsapp_adapter_template_and_acceptance(self):
         self.preview()
         delivery = ResultShareDelivery.objects.get(channel="whatsapp")
@@ -265,6 +301,7 @@ class ResultSharingTests(APITestCase):
             self.assertEqual(body["template"]["components"][0]["parameters"][0]["text"], delivery.body)
             self.assertNotIn("\n", delivery.body)
 
+    # Classify permanent WhatsApp client errors as rejected and server errors as uncertain.
     def test_whatsapp_adapter_error_classification(self):
         self.preview()
         delivery = ResultShareDelivery.objects.get(channel="whatsapp")
@@ -275,6 +312,7 @@ class ResultSharingTests(APITestCase):
                     submit_whatsapp(delivery)
 
 
+    # Reject queueing when the guardian's contact changes after the preview was generated.
     def test_contact_change_before_queue_rejected(self):
         data = self.preview().data
         self.guardian.email = "changed@example.test"
@@ -282,6 +320,7 @@ class ResultSharingTests(APITestCase):
         self.assertEqual(self.queue(data).status_code, 400)
         self.assertFalse(ResultShareDelivery.objects.filter(status="queued").exists())
 
+    # Cancel queued delivery if a result changes before the worker submits it.
     def test_result_edit_after_queue_cancels_submission(self):
         self.queue()
         Result.objects.update(score=Decimal("72"), is_verified=False)
@@ -292,6 +331,7 @@ class ResultSharingTests(APITestCase):
         self.assertEqual(ResultShareDelivery.objects.filter(status="cancelled").count(), 2)
         self.assertEqual(len(mail.outbox), 0)
 
+    # Split long WhatsApp reports into bounded tracked parts without losing report content.
     def test_whatsapp_long_report_split_into_tracked_parts_without_truncation(self):
         for i in range(15):
             course = Course.objects.create(code=f"EEE{i:03}", title="Long report course")
@@ -314,17 +354,20 @@ class ResultSharingTests(APITestCase):
             self.assertEqual(send.call_count, len(parts))
         self.assertEqual(len(mail.outbox), 1)
 
+    # Prevent a console email backend from being treated as a real delivery provider.
     def test_console_backend_cannot_claim_email_delivery(self):
         data = self.preview({**self.payload, "channels": ["email"]}).data
         with override_settings(EMAIL_BACKEND="django.core.mail.backends.console.EmailBackend"):
             self.assertEqual(self.queue(data).status_code, 400)
 
+    # Diagnose and refuse queueing when the selected semester has no recorded results.
     def test_no_recorded_semester_results_is_diagnosed(self):
         payload = {**self.payload, "semester": "rain"}
         data = self.preview(payload).data
         self.assertEqual(data["preview"][0]["diagnostic_code"], "results_missing_or_unverified")
         self.assertEqual(self.queue(data).status_code, 400)
 
+    # Deny linked student accounts access to guardian-report preview operations.
     def test_linked_student_cannot_preview_guardian_reports(self):
         from django.contrib.auth import get_user_model
         account = get_user_model().objects.create_user(username="student-account")
@@ -333,6 +376,7 @@ class ResultSharingTests(APITestCase):
         self.client.force_authenticate(account)
         self.assertEqual(self.preview().status_code, 403)
 
+    # Treat ambiguous email transport failure as unknown and exclude it from retry.
     def test_email_uncertain_delivery_not_retried(self):
         data = self.preview({**self.payload, "channels": ["email"]}).data
         self.queue(data)
@@ -343,7 +387,7 @@ class ResultSharingTests(APITestCase):
         retry = reverse("result-share-retry", kwargs={"batch_id": data["id"]})
         self.assertEqual(self.client.post(retry).data["requeued"], 0)
 
-
+    # Return paginated batch summaries only to HODs.
     def test_history_list_is_paginated_and_hod_only(self):
         data = self.preview().data
         response = self.client.get(reverse("result-share-list"))
@@ -353,12 +397,13 @@ class ResultSharingTests(APITestCase):
         self.client.force_authenticate(self.staff)
         self.assertEqual(self.client.get(reverse("result-share-list")).status_code, 403)
 
+    # Reject repeated student IDs before a preview batch or deliveries are persisted.
     def test_duplicate_selection_is_rejected_before_creating_batch(self):
         response = self.preview({**self.payload, "student_ids": [str(self.student.pk), str(self.student.pk)]})
         self.assertEqual(response.status_code, 400)
         self.assertFalse(ResultShareBatch.objects.exists())
 
-
+    # Prevent guardian admin edits from transferring a sharing contact to another student.
     def test_guardian_admin_cannot_relink_sharing_contact_to_another_student(self):
         from django.test import Client
         other = Student.objects.create(identifier_type="utme", identifier_value="another-id",

@@ -24,7 +24,7 @@ video {
 }
 
 .hero {
-  background-image: url("/src/assets/fast1193.webp");
+  background-image: url("./assets/fast1193.webp");
   background-size: cover;
   background-position: center;
 }

@@ -2,14 +2,12 @@ import { motion } from "framer-motion";
 import { Carousel } from "react-responsive-carousel";
 import "react-responsive-carousel/lib/styles/carousel.min.css"; // Import default styles
 import { Link } from "react-router-dom";
-import studentsImage from '../assets/fast1193.webp';
-import campusImage from '../assets/oau.jpg';
-import departmentImage from '../assets/OIP (1).webp';
+import campus from '../assets/fast1193.webp';
+import university from '../assets/oau.jpg';
+import faculty from '../assets/OIP (1).webp';
 const Hero = () => {
   const images = [
-    studentsImage,
-    campusImage,
-    departmentImage,
+    campus, university, faculty,
   ];
 
   return (

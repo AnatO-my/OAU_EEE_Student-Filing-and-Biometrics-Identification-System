@@ -8,9 +8,11 @@ from .models import User, AdviserAssignment, AdviserMessage, HODMessage
 from .services import send_adviser_message, send_hod_message
 
 
+# Exercise message delivery, recipient isolation, and CSRF behavior across both inboxes.
 @override_settings(CURRENT_ACADEMIC_SESSION="2026/2027")
 class MessagingIntegrationTests(TestCase):
 
+    # Create the HOD, advisers, assignments, and student profiles used by the API tests.
     def setUp(self):
         self.client = APIClient()
         self.hod = User.objects.create_superuser(
@@ -36,6 +38,7 @@ class MessagingIntegrationTests(TestCase):
         self.student = self.make_student("S-001", 300, self.student_user)
         self.other_student = self.make_student("S-002", 400, self.other_user)
 
+    # Create a profile with the requested level, account link, and active status.
     def make_student(self, identifier, level, user=None, is_active=True):
         return Student.objects.create(
             identifier_type="matriculation",
@@ -49,6 +52,7 @@ class MessagingIntegrationTests(TestCase):
             is_active=is_active,
         )
 
+    # Submit an HOD message request using the chosen audience and target fields.
     def post(self, audience, **target):
         return self.client.post(
             "/api/hod-messages/",
@@ -61,6 +65,7 @@ class MessagingIntegrationTests(TestCase):
             format="json",
         )
 
+    # Only a saved recipient can retrieve an individual adviser message.
     def test_message_detail_is_visible_only_to_recipient(self):
         message = send_adviser_message(
             user=self.adviser,
@@ -89,6 +94,7 @@ class MessagingIntegrationTests(TestCase):
 
         self.assertEqual(response.status_code, 404)
 
+    # Student inbox endpoints reject modifications and preserve stored message text.
     def test_student_cannot_modify_or_delete_received_message(self):
         message = send_adviser_message(
             user=self.adviser,
@@ -116,6 +122,7 @@ class MessagingIntegrationTests(TestCase):
         message.refresh_from_db()
         self.assertEqual(message.body, "Original content.")
 
+    # Anonymous users, students, and ordinary advisers cannot send HOD messages.
     def test_anonymous_student_and_staff_cannot_send_hod_messages(self):
         for user in [None, self.student_user, self.adviser]:
             self.client.force_authenticate(user)
@@ -125,6 +132,7 @@ class MessagingIntegrationTests(TestCase):
             )
         self.assertEqual(HODMessage.objects.count(), 0)
 
+    # The message service itself enforces HOD authorization outside the API.
     def test_service_rejects_nonhod_direct_call(self):
         for user in [AnonymousUser(), self.adviser, self.student_user]:
             with self.assertRaises(PermissionDenied):
@@ -139,6 +147,7 @@ class MessagingIntegrationTests(TestCase):
                 )
         self.assertEqual(HODMessage.objects.count(), 0)
 
+    # The HOD can message an individual student without an adviser assignment.
     def test_hod_sends_individual_message_without_assignment(self):
         self.client.force_authenticate(self.hod)
         response = self.post("individual", recipient_id=str(self.student.pk))
@@ -149,6 +158,7 @@ class MessagingIntegrationTests(TestCase):
         self.assertSetEqual(set(message.recipients.all()), {self.student})
         self.assertEqual(message.adviser_recipients.count(), 0)
 
+    # Level-targeted HOD messages exclude inactive students and other levels.
     def test_level_message_excludes_other_level_and_inactive_students(self):
         self.make_student("INACTIVE", 300, is_active=False)
         second = self.make_student("S-003", 300)
@@ -158,6 +168,7 @@ class MessagingIntegrationTests(TestCase):
         message = HODMessage.objects.get(pk=response.data["message_id"])
         self.assertSetEqual(set(message.recipients.all()), {self.student, second})
 
+    # HOD adviser messages target only staff with a current active assignment.
     def test_adviser_message_only_targets_current_assigned_staff(self):
         self.client.force_authenticate(self.hod)
         response = self.post("adviser", adviser_id=self.adviser.pk)
@@ -172,6 +183,7 @@ class MessagingIntegrationTests(TestCase):
         )
         self.assertEqual(HODMessage.objects.count(), 1)
 
+    # Missing, malformed, or conflicting audience targets fail without saving.
     def test_invalid_and_conflicting_targets_do_not_save_messages(self):
         self.client.force_authenticate(self.hod)
         for audience, target in [
@@ -187,12 +199,14 @@ class MessagingIntegrationTests(TestCase):
             self.assertEqual(self.post(audience, **target).status_code, 400)
         self.assertEqual(HODMessage.objects.count(), 0)
 
+    # HOD sending is denied if no current academic session is configured.
     @override_settings(CURRENT_ACADEMIC_SESSION="")
     def test_missing_session_rejects_hod_sending(self):
         self.client.force_authenticate(self.hod)
         self.assertEqual(self.post("level", level=300).status_code, 403)
         self.assertEqual(HODMessage.objects.count(), 0)
 
+    # Session-authenticated HOD message creation requires a valid CSRF token.
     def test_hod_session_post_requires_csrf(self):
         self.client = APIClient(enforce_csrf_checks=True)
         self.client.force_login(self.hod)
@@ -212,6 +226,7 @@ class MessagingIntegrationTests(TestCase):
         )
         self.assertEqual(response.status_code, 201)
 
+    # HOD inboxes contain only stored recipients and do not reveal recipient relations.
     def test_hod_inbox_only_returns_saved_recipients(self):
         self.client.force_authenticate(self.hod)
         self.post("individual", recipient_id=str(self.student.pk))
@@ -234,6 +249,7 @@ class MessagingIntegrationTests(TestCase):
         self.client.force_authenticate(self.student_user)
         self.assertEqual(self.client.get("/api/me/hod-messages/").data["count"], 1)
 
+    # Student adviser inboxes are recipient-scoped and expose read-only message data.
     def test_adviser_inbox_is_isolated_and_read_only(self):
         message = send_adviser_message(
             user=self.adviser,

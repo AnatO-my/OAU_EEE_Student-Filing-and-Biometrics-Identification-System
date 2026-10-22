@@ -7,6 +7,7 @@ from django.test import SimpleTestCase
 from .calculations import calculate_weighted_average
 
 
+# Build a lightweight result object for weighted-average unit tests.
 def make_result(score, units, verified=True):
     return SimpleNamespace(
         score=Decimal(score) if score is not None else None,
@@ -15,7 +16,9 @@ def make_result(score, units, verified=True):
     )
 
 
+# Exercise credit weighting, verification, units, and empty-history behavior.
 class WeightedAverageTests(SimpleTestCase):
+    # Confirm each course contributes according to its credit units.
     def test_courses_are_weighted_by_units(self):
         results = [
             make_result("70", 3),  # 5 × 3 = 15
@@ -27,6 +30,7 @@ class WeightedAverageTests(SimpleTestCase):
             Decimal("4.2"),  # 21 / 5
         )
 
+    # Ensure failed attempts and repeats both remain in the cumulative calculation.
     def test_failed_attempt_and_repeat_both_count(self):
         results = [
             make_result("30", 3),  # Failed attempt: 0 points
@@ -38,9 +42,11 @@ class WeightedAverageTests(SimpleTestCase):
             Decimal("2.5"),  # 15 / 6
         )
 
+    # Treat an empty result set as an unavailable average rather than zero.
     def test_no_results_returns_none(self):
         self.assertIsNone(calculate_weighted_average([]))
 
+    # Refuse to calculate when any supplied attempt has not been verified.
     def test_unverified_result_blocks_calculation(self):
         results = [
             make_result("70", 3),
@@ -50,10 +56,12 @@ class WeightedAverageTests(SimpleTestCase):
         with self.assertRaises(ValidationError):
             calculate_weighted_average(results)
 
+    # Confirm a missing score prevents conversion to a grade point.
     def test_missing_score_blocks_calculation(self):
         with self.assertRaises(ValidationError):
             calculate_weighted_average([make_result(None, 3)])
 
+    # Reject non-positive, boolean, non-integer, and absent credit-unit values.
     def test_invalid_units_are_rejected(self):
         for units in (0, -1, True, Decimal("3"), None):
             with self.subTest(units=units):
@@ -62,6 +70,7 @@ class WeightedAverageTests(SimpleTestCase):
                         [make_result("70", units)]
                     )
 
+    # Preserve precise decimal averages instead of rounding near a grade threshold.
     def test_average_below_one_is_not_rounded_up(self):
         results = [
             make_result("40", 199),

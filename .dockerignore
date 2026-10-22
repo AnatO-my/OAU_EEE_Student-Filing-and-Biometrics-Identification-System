@@ -1,0 +1,35 @@
+# Only source required by the image is sent to the builder. Private databases,
+# certificates, credentials, exports, hardware material, and Git history stay out.
+**
+!Dockerfile
+!.dockerignore
+!requirements.txt
+!manage.py
+!app/
+!app/**
+!deployment/
+!deployment/**
+!frontend/
+!frontend/portal/
+!frontend/portal/**
+**/.env
+**/.env.*
+**/*.env
+**/*.pem
+**/*.key
+**/*.crt
+**/*.pfx
+**/*.p12
+**/*.sqlite3
+**/*.sqlite3-*
+**/*.dump
+**/*.sql
+**/*.sql.gz
+**/__pycache__/
+**/*.pyc
+**/node_modules/
+**/dist/
+**/staticfiles/
+**/media/
+**/uploads/
+**/*.log

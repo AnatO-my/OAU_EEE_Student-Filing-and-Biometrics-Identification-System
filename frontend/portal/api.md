@@ -1,8 +1,8 @@
 # Frontend-to-backend API reference
 
-**Project:** OAU EEE Student Records & Identification System  
-**Checked against the active workspace:** 18 October 2026  
-**Frontend direction:** React  
+**Project:** OAU EEE Student Records & Identification System<br>
+**Checked against the active workspace:** 18 October 2026<br>
+**Frontend direction:** React<br>
 **Backend:** Django and Django REST Framework, using session authentication
 
 This document explains how React sends a user's instructions to the backend,

@@ -8,6 +8,7 @@ from rest_framework.test import APIClient
 from accounts.models import AdviserAssignment, AdviserMessage
 from students.models import Guardian, Student
 from documents.models import StudentDocument
+from documents.test_storage import isolate_document_storage
 from .current_session import current_session_name, current_session_state, select_current_session
 from .models import AcademicSession, AcademicSessionSelection, Course, CourseOffering, Result
 
@@ -15,6 +16,7 @@ from .models import AcademicSession, AcademicSessionSelection, Course, CourseOff
 @override_settings(CURRENT_ACADEMIC_SESSION="2026/2027")
 class CurrentSessionIntegrationTests(TestCase):
     def setUp(self):
+        isolate_document_storage(self)
         User = get_user_model()
         self.hod = User.objects.create_superuser("calendar-hod", "hod@example.invalid", "synthetic-password")
         self.staff = User.objects.create_user("calendar-adviser", is_staff=True)

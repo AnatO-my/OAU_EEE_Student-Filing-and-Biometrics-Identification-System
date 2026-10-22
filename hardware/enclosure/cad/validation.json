@@ -1,0 +1,152 @@
+{
+  "revision": "B - rounded rectangular enclosure, approximate hardware fit",
+  "units": "mm",
+  "parts": {
+    "main_body": {
+      "valid": true,
+      "solid_count": 1,
+      "step_round_trip": true,
+      "volume_mm3": 189528.062,
+      "bounding_box_mm": [
+        150.014,
+        97.013,
+        100.014
+      ]
+    },
+    "rear_cover": {
+      "valid": true,
+      "solid_count": 1,
+      "step_round_trip": true,
+      "volume_mm3": 44508.807,
+      "bounding_box_mm": [
+        150.012,
+        3.012,
+        100.012
+      ]
+    },
+    "control_panel": {
+      "valid": true,
+      "solid_count": 1,
+      "step_round_trip": true,
+      "volume_mm3": 7465.501,
+      "bounding_box_mm": [
+        80.008,
+        1.208,
+        84.008
+      ]
+    },
+    "battery_pod": {
+      "valid": true,
+      "solid_count": 1,
+      "step_round_trip": true,
+      "volume_mm3": 80497.682,
+      "bounding_box_mm": [
+        40.011,
+        100.011,
+        100.011
+      ]
+    },
+    "battery_cover": {
+      "valid": true,
+      "solid_count": 1,
+      "step_round_trip": true,
+      "volume_mm3": 24630.957,
+      "bounding_box_mm": [
+        3.011,
+        100.011,
+        100.011
+      ]
+    },
+    "battery_cover_insert": {
+      "valid": true,
+      "solid_count": 1,
+      "step_round_trip": true,
+      "volume_mm3": 5045.827,
+      "bounding_box_mm": [
+        0.808,
+        79.608,
+        79.608
+      ]
+    },
+    "sensor_adapter_r307": {
+      "valid": true,
+      "solid_count": 1,
+      "step_round_trip": true,
+      "volume_mm3": 6002.004,
+      "bounding_box_mm": [
+        44.008,
+        2.008,
+        80.008
+      ]
+    },
+    "sensor_adapter_as608": {
+      "valid": true,
+      "solid_count": 1,
+      "step_round_trip": true,
+      "volume_mm3": 6312.004,
+      "bounding_box_mm": [
+        44.008,
+        2.008,
+        80.008
+      ]
+    }
+  },
+  "intersections_mm3": {
+    "main_body / rear_cover": 0.0,
+    "main_body / control_panel": 0.0,
+    "main_body / battery_pod": 0.0,
+    "main_body / battery_cover": 0.0,
+    "main_body / battery_cover_insert": 0.0,
+    "main_body / sensor_adapter_r307": 0.0,
+    "rear_cover / control_panel": 0.0,
+    "rear_cover / battery_pod": 0.0,
+    "rear_cover / battery_cover": 0.0,
+    "rear_cover / battery_cover_insert": 0.0,
+    "rear_cover / sensor_adapter_r307": 0.0,
+    "control_panel / battery_pod": 0.0,
+    "control_panel / battery_cover": 0.0,
+    "control_panel / battery_cover_insert": 0.0,
+    "control_panel / sensor_adapter_r307": 0.0,
+    "battery_pod / battery_cover": 0.0,
+    "battery_pod / battery_cover_insert": 0.0,
+    "battery_pod / sensor_adapter_r307": 0.0,
+    "battery_cover / battery_cover_insert": 0.0,
+    "battery_cover / sensor_adapter_r307": 0.0,
+    "battery_cover_insert / sensor_adapter_r307": 0.0
+  },
+  "illustrative_reservation_collisions_mm3": {
+    "veroboard_plate_only": {
+      "main_body": 0.0,
+      "rear_cover": 0.0,
+      "control_panel": 0.0,
+      "battery_pod": 0.0,
+      "battery_cover": 0.0,
+      "battery_cover_insert": 0.0,
+      "sensor_adapter_r307": 0.0
+    },
+    "sensor_and_cable": {
+      "main_body": 0.0,
+      "rear_cover": 0.0,
+      "control_panel": 0.0,
+      "battery_pod": 0.0,
+      "battery_cover": 0.0,
+      "battery_cover_insert": 0.0,
+      "sensor_adapter_r307": 0.0
+    },
+    "battery_pack_holder": {
+      "main_body": 0.0,
+      "rear_cover": 0.0,
+      "control_panel": 0.0,
+      "battery_pod": 0.0,
+      "battery_cover": 0.0,
+      "battery_cover_insert": 0.0,
+      "sensor_adapter_r307": 0.0
+    }
+  },
+  "assembly_bounding_box_mm": [
+    193.01,
+    102.01,
+    100.01
+  ],
+  "status": "solid geometry verified; hardware fit and manufacture unverified"
+}

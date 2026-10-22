@@ -1,0 +1,8 @@
+{
+	email {$TLS_EMAIL}
+	admin off
+}
+
+{$PUBLIC_HOST} {
+	import /srv/eee-caddy-routes
+}

@@ -15,11 +15,11 @@ const content = {
   "/privacy": {
     label: "Privacy",
     title: "Your information and privacy",
-    intro: "Signed-in workspaces use the departmental API for permitted records. Separate demo pages use illustrative data.",
+    intro: "Your account connects to departmental records. Available workspaces depend on your role, permissions and current assignments.",
     sections: [
       ["Use of personal information", "A production portal should only collect information required for academic administration and should restrict access by role."],
       ["Academic records", "Student records, advising notes and results should only be available to authorised users and should be protected by server-side access controls."],
-      ["Connected services", "Use the server configured by your department. Feature availability depends on the installed backend and the permissions assigned to your account."],
+      ["Prototype warning", "Use an institutional account only when the approved API is configured. Academic workflows, file storage and audit logging still require implementation and production review."],
     ],
   },
   "/about": {
@@ -29,7 +29,7 @@ const content = {
     sections: [
       ["For students", "Review profile information, course registration, published results, schedules, resources, requests and announcements."],
       ["For department staff", "Support course and result management, student communication, advising, departmental oversight and approval workflows."],
-      ["Workspaces and demos", "Account workspaces load permitted records from the department server. The separate demo previews future workflows with illustrative content."],
+      ["Working with departmental records", "The portal loads records within your account's access scope. Contact your department administrator for account, profile or assignment changes."],
     ],
   },
 };

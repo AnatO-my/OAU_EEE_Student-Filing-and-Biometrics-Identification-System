@@ -9,7 +9,9 @@ from .access import academic_students_for
 from .grading import validate_bands
 
 
+# Validate result creation and scope selectable students to the authenticated requester.
 class ResultCreateSerializer(serializers.Serializer):
+    # Narrow student choices to records the request user may access.
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         request = self.context.get("request")
@@ -40,6 +42,7 @@ class ResultCreateSerializer(serializers.Serializer):
     )
 
 
+# Return result fields as read-only data for review and reporting endpoints.
 class ResultSerializer(serializers.ModelSerializer):
     class Meta:
         model = Result
@@ -56,6 +59,7 @@ class ResultSerializer(serializers.ModelSerializer):
         read_only_fields = fields
 
 
+# Accept a required score correction, including an explicit null to clear the score.
 class ResultScoreUpdateSerializer(serializers.Serializer):
     score = serializers.DecimalField(
         max_digits=5,
@@ -67,6 +71,7 @@ class ResultScoreUpdateSerializer(serializers.Serializer):
     )
 
 
+# Require the score value the reviewer actually checked before verification.
 class ResultVerifySerializer(serializers.Serializer):
     expected_score = serializers.DecimalField(
         max_digits=5,
@@ -78,6 +83,7 @@ class ResultVerifySerializer(serializers.Serializer):
     )
 
 
+# Validate optional result-list filters and enforce consecutive academic-year boundaries.
 class ResultFilterSerializer(serializers.Serializer):
     student_id = serializers.UUIDField(required=False)
 
@@ -93,6 +99,7 @@ class ResultFilterSerializer(serializers.Serializer):
 
     is_verified = serializers.BooleanField(required=False)
 
+    # Reject academic years whose second year does not immediately follow the first.
     def validate_academic_session(self, value):
         first_year, second_year = map(int, value.split("/"))
 
@@ -103,6 +110,7 @@ class ResultFilterSerializer(serializers.Serializer):
 
         return value
 
+# Resolve a requested session and semester for GPA calculation.
 class StudentGPAQuerySerializer(serializers.Serializer):
     academic_session = serializers.SlugRelatedField(
         slug_field="name",
@@ -115,12 +123,14 @@ class StudentGPAQuerySerializer(serializers.Serializer):
     )
 
 
+# Serialize academic sessions and reuse model rules for session-name validation.
 class AcademicSessionSerializer(serializers.ModelSerializer):
     class Meta:
         model = AcademicSession
         fields = ["id", "name"]
         read_only_fields = ["id"]
 
+    # Apply AcademicSession's calendar-year validation to incoming API values.
     def validate_name(self, value):
         session = AcademicSession(name=value)
         from django.core.exceptions import ValidationError as ModelValidationError
@@ -131,6 +141,7 @@ class AcademicSessionSerializer(serializers.ModelSerializer):
         return value
 
 
+# Expose catalogue courses while keeping generated IDs read-only.
 class CourseSerializer(serializers.ModelSerializer):
     class Meta:
         model = Course
@@ -138,6 +149,7 @@ class CourseSerializer(serializers.ModelSerializer):
         read_only_fields = ["id"]
 
 
+# Serialize teaching-period offerings and permit only published grading versions.
 class CourseOfferingSerializer(serializers.ModelSerializer):
     grading_scale = serializers.PrimaryKeyRelatedField(
         queryset=GradingScale.objects.filter(is_published=True), required=False,
@@ -149,10 +161,12 @@ class CourseOfferingSerializer(serializers.ModelSerializer):
         read_only_fields = ["id"]
 
 
+# Validate editable scale names and normalize fully validated grading bands.
 class GradingScaleWriteSerializer(serializers.Serializer):
     name = serializers.CharField(max_length=100)
     bands = serializers.ListField(child=serializers.JSONField(), allow_empty=False)
 
+    # Reuse grading rules and emit decimal values in a stable JSON-safe representation.
     def validate_bands(self, value):
         from django.core.exceptions import ValidationError as ModelValidationError
         try:
@@ -163,6 +177,7 @@ class GradingScaleWriteSerializer(serializers.Serializer):
                 for low, high, points in parsed]
 
 
+# Expose all grading-version fields as read-only API data.
 class GradingScaleSerializer(serializers.ModelSerializer):
     class Meta:
         model = GradingScale
@@ -170,12 +185,14 @@ class GradingScaleSerializer(serializers.ModelSerializer):
         read_only_fields = fields
 
 
+# Require the published scale to assign to an offering.
 class OfferingScaleSerializer(serializers.Serializer):
     grading_scale = serializers.PrimaryKeyRelatedField(
         queryset=GradingScale.objects.filter(is_published=True)
     )
 
 
+# Serialize course requirements while reserving student and recorder fields for the server.
 class CourseRequirementSerializer(serializers.ModelSerializer):
     class Meta:
         model = CourseRequirement
@@ -183,18 +200,21 @@ class CourseRequirementSerializer(serializers.ModelSerializer):
         read_only_fields = ["id", "student", "recorded_by"]
 
 
+# Validate approval evidence and explicit HOD confirmations before graduation review.
 class GraduationApprovalSerializer(serializers.Serializer):
     notes = serializers.CharField()
     expected_digest = serializers.RegexField(regex=r"^[a-f0-9]{64}$")
     history_complete = serializers.BooleanField()
     other_requirements_satisfied = serializers.BooleanField()
 
+    # Require affirmative confirmation of both history and non-academic requirements.
     def validate(self, attrs):
         if not attrs["history_complete"] or not attrs["other_requirements_satisfied"]:
             raise serializers.ValidationError("The HOD must confirm complete history and other graduation requirements.")
         return attrs
 
 
+# Return stored HOD review snapshots without allowing client-side changes.
 class GraduationReviewSerializer(serializers.ModelSerializer):
     class Meta:
         model = GraduationReview

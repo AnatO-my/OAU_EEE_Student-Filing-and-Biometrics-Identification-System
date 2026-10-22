@@ -2,6 +2,8 @@ from academics.session_context import current_session_name
 from rest_framework import generics, permissions, filters
 from rest_framework.pagination import PageNumberPagination
 from django.conf import settings
+from django.shortcuts import get_object_or_404
+from django.core.exceptions import ValidationError as ModelValidationError
 
 from .models import Student
 from .serializers import StudentSerializer, StudentFilterSerializer, BulkStudentStatusSerializer
@@ -85,6 +87,45 @@ from rest_framework.response import Response
 from accounts.views import IsHOD
 from .serializers import BulkStudentLevelSerializer
 from .services import bulk_change_student_levels
+from .identity import resolve_student_identifier
+from .serializers import StudentLookupSerializer, StudentIdentifierPromotionSerializer
+from .services import promote_student_identifier
+
+
+class StudentIdentifierLookupView(APIView):
+    permission_classes = [permissions.IsAdminUser]
+
+    def get(self, request):
+        if not request.user.has_perm("students.view_student"):
+            self.permission_denied(request)
+        serializer = StudentLookupSerializer(data=request.query_params)
+        serializer.is_valid(raise_exception=True)
+        try:
+            student = resolve_student_identifier(**serializer.validated_data,
+                queryset=students_visible_to(request.user, current_session_name()))
+        except ModelValidationError as error:
+            from rest_framework.exceptions import ValidationError
+            raise ValidationError(error.messages) from None
+        if student is None:
+            from rest_framework.exceptions import NotFound
+            raise NotFound("No matching student is available in your access scope.")
+        return Response(StudentSerializer(student).data)
+
+
+class StudentIdentifierPromotionView(APIView):
+    permission_classes = [IsHOD]
+
+    def post(self, request, student_id):
+        serializer = StudentIdentifierPromotionSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        student = get_object_or_404(Student, pk=student_id)
+        try:
+            student = promote_student_identifier(user=request.user, student=student,
+                **serializer.validated_data)
+        except ModelValidationError as error:
+            from rest_framework.exceptions import ValidationError
+            raise ValidationError(error.messages) from None
+        return Response(StudentSerializer(student).data)
 
 
 # Accept atomic level-change requests from the HOD only.

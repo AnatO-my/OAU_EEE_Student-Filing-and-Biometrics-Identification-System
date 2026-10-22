@@ -30,7 +30,7 @@ export default function Footer() {
           <Link to="/access-denied" className="transition hover:text-blue-300">Access support</Link>
         </nav>
       </div>
-      <p className="mx-auto mt-5 max-w-7xl text-xs text-slate-400">Account workspaces use permitted departmental records. Demo pages use illustrative data.</p>
+      <p className="mx-auto mt-5 max-w-7xl text-xs text-slate-600">Private departmental records. Sign out when you finish using a shared computer.</p>
     </footer>
   );
 }

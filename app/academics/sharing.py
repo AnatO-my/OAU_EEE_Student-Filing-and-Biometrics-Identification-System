@@ -18,10 +18,12 @@ from .models import (CourseOffering, GuardianSharingPreference, ResultShareBatch
 from .services import require_hod
 
 
+# Create a stable SHA-256 fingerprint for a preview's serialized content.
 def digest(value):
     return hashlib.sha256(json.dumps(value, sort_keys=True).encode()).hexdigest()
 
 
+# Normalize and validate a guardian's email address or international phone number.
 def contact(guardian, channel):
     value = (guardian.email or "").strip() if channel == "email" else guardian.phone_number.strip()
     if channel == "email":
@@ -34,6 +36,7 @@ def contact(guardian, channel):
     return value, ""
 
 
+# Build a verified-results report and cumulative average through the selected semester.
 def report_for(student, session, semester):
     # CGPA is cumulative as of the selected period, excluding later results.
     results = list(student.results.select_related("grading_scale", "offering__course",
@@ -63,6 +66,7 @@ def report_for(student, session, semester):
     return {"gpa": str(gpa), "cgpa": str(cgpa), "records": records, "text": "\n".join(lines)}
 
 
+# Create human-reviewable diagnostics and corresponding draft or skipped delivery rows.
 def build_preview(students, session, semester, channels):
     preview, deliveries = [], []
     for student in students:
@@ -109,6 +113,7 @@ def build_preview(students, session, semester, channels):
     return preview, deliveries
 
 
+# Lock all selected student rows in stable order and reject missing IDs.
 def lock_students(ids):
     students = list(Student.objects.select_for_update().filter(pk__in=ids).order_by("pk"))
     if len(students) != len(ids):
@@ -117,6 +122,7 @@ def lock_students(ids):
 
 
 @transaction.atomic
+# Create an idempotent HOD preview and persist its delivery rows without contacting providers.
 def create_preview(*, user, request_id, student_ids, academic_session, semester, channels):
     require_hod(user)
     ids, channels = sorted(str(i) for i in student_ids), sorted(channels)
@@ -142,6 +148,7 @@ def create_preview(*, user, request_id, student_ids, academic_session, semester,
 
 
 @transaction.atomic
+# Queue eligible preview rows only if its digest, student history, and providers still match.
 def queue_batch(*, user, batch, expected_digest):
     require_hod(user)
     batch = ResultShareBatch.objects.select_for_update().get(pk=batch.pk)
@@ -166,6 +173,7 @@ def queue_batch(*, user, batch, expected_digest):
 
 
 @transaction.atomic
+# Record or update a guardian's channel permissions together with the supporting evidence.
 def set_preference(*, user, guardian, email_enabled, whatsapp_enabled, evidence):
     require_hod(user)
     Student.objects.select_for_update().get(pk=guardian.student_id)
@@ -178,6 +186,7 @@ def set_preference(*, user, guardian, email_enabled, whatsapp_enabled, evidence)
 
 
 @transaction.atomic
+# Requeue only failed deliveries below the bounded retry count.
 def retry_failed(*, user, batch):
     require_hod(user)
     batch = ResultShareBatch.objects.select_for_update().get(pk=batch.pk)
@@ -188,6 +197,7 @@ def retry_failed(*, user, batch):
     return failed.update(status="queued", diagnostic_code="")
 
 
+# Serialize a batch preview with delivery-state counts and bounded status details.
 def batch_data(batch):
     counts = Counter(batch.deliveries.values_list("status", flat=True))
     return {"id": str(batch.pk), "history_digest": batch.history_digest,

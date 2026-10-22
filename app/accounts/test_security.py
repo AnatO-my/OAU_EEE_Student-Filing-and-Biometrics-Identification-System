@@ -12,6 +12,7 @@ from rest_framework.test import APIClient
 from .models import User
 
 
+# Verify default security headers and cookie settings for local and production use.
 class SecuritySettingDefaultsTests(SimpleTestCase):
     #development and the test suite run over plain HTTP, so the transport flags
     #stay off unless DJANGO_SECURE_TRANSPORT is enabled, otherwise every local
@@ -22,16 +23,19 @@ class SecuritySettingDefaultsTests(SimpleTestCase):
         self.assertFalse(settings.SECURE_SSL_REDIRECT)
         self.assertEqual(settings.SECURE_HSTS_SECONDS, 0)
 
+    # Ensure response-hardening headers stay enabled regardless of transport mode.
     def test_response_hardening_is_always_on(self):
         self.assertTrue(settings.SECURE_CONTENT_TYPE_NOSNIFF)
         self.assertEqual(settings.SECURE_REFERRER_POLICY, "same-origin")
         self.assertEqual(settings.X_FRAME_OPTIONS, "DENY")
 
+    # Confirm session cookies are HTTP-only and expire after the configured lifetime.
     def test_session_cookie_hardening_defaults(self):
         self.assertTrue(settings.SESSION_COOKIE_HTTPONLY)
         self.assertEqual(settings.SESSION_COOKIE_AGE, 12 * 60 * 60)
 
 
+# Run Django's deployment security check with production-like settings.
 class DeployCheckTests(SimpleTestCase):
     #runs Django's own deploy check under production-like environment variables
     #and fails the suite if any deployment security warning appears, the only
@@ -70,6 +74,7 @@ class DeployCheckTests(SimpleTestCase):
         )
 
 
+# Ensure login rotates a pre-existing anonymous session key.
 class SessionKeyRotationTests(TestCase):
     #login must replace the anonymous session key so a session planted before
     #authentication cannot be reused afterwards, this is session fixation

@@ -36,8 +36,9 @@ export default function Register() {
           <Sectionheader title="How to get an account" level={3} centered accent />
           <p className="mt-4 text-center text-sm leading-6 text-slate-600">
             Contact your departmental administrator with your institutional
-            details. Once your account has been created, sign in with the
-            username and temporary or assigned password provided to you.
+            details. For student access, the HOD links an account to your
+            student record and gives you a private, one-time setup link.
+            Choose your own password, then sign in with your issued username.
           </p>
           <p className="mt-4 text-center text-xs leading-5 text-slate-500">
             For security, do not send passwords through email or include them

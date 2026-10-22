@@ -441,7 +441,7 @@ const Login = () => {
             <div className="login-grid">
               <div className="login-panel">
                 <h2>Sign in</h2>
-                <p>Use the username and password issued for your account.</p>
+                <p>Use your account username and password.</p>
 
                 <form
                   id="login-form-main"

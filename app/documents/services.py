@@ -1,17 +1,21 @@
 import os
 import tempfile
-
-from django.core.files.base import File
-from django.db import transaction
-from django.utils import timezone
-
-from .ocr import OcrResult, OcrUnavailable, run_ocr
 from dataclasses import dataclass
 
 from django.conf import settings
+from django.contrib.auth import get_user_model
+from django.core.exceptions import PermissionDenied
+from django.core.files.base import File
+from django.db import transaction
+from django.http import Http404
+from django.utils import timezone
+
+from academics.session_context import current_session_name
+from students.models import Student
+from students.services import students_visible_to
 
 from .models import StudentDocument
-from .ocr import OcrResult
+from .ocr import OcrResult, OcrUnavailable, run_ocr
 
 
 @dataclass(frozen=True)
@@ -34,6 +38,28 @@ def assess_quality(result: OcrResult) -> QualityDecision:
     if reasons:
         return QualityDecision(False, None, reasons)
     return QualityDecision(True, StudentDocument.Status.ACCEPTED, [])
+
+
+def lock_upload_context(*, student, uploaded_by):
+    """Lock in the shared User -> Student order and recheck post-OCR access."""
+    User = get_user_model()
+    try:
+        uploader = User.objects.select_for_update().get(pk=uploaded_by.pk)
+    except User.DoesNotExist:
+        raise PermissionDenied("An active staff account is required.") from None
+    if not (uploader.is_active and uploader.is_staff
+            and uploader.has_perm("documents.add_studentdocument")):
+        raise PermissionDenied("You do not have permission to upload student documents.")
+
+    try:
+        current_student = Student.objects.select_for_update().get(pk=student.pk)
+    except Student.DoesNotExist:
+        raise Http404 from None
+    if not students_visible_to(uploader, current_session_name()).filter(pk=current_student.pk).exists():
+        raise Http404
+    return current_student, uploader
+
+
 def process_upload(*, student, uploaded_file, document_type, uploaded_by):
     """Quality-check the file and keep it only if it passes.
 
@@ -62,6 +88,9 @@ def process_upload(*, student, uploaded_file, document_type, uploaded_by):
             return None, decision
 
         with transaction.atomic():
+            # All uploaders for the student share this lock, including when no
+            # prior document exists yet. OCR itself does not hold database locks.
+            student, uploaded_by = lock_upload_context(student=student, uploaded_by=uploaded_by)
             StudentDocument.objects.filter(
                 student=student,
                 document_type=document_type,

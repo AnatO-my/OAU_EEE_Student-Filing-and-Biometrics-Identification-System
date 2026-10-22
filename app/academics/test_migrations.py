@@ -5,7 +5,9 @@ from django.db.migrations.executor import MigrationExecutor
 from django.test import TransactionTestCase
 
 
+# Verify the grading-history migration preserves existing result values.
 class GradingHistoryMigrationTests(TransactionTestCase):
+    # Confirm legacy results retain their original scale and stored score data.
     def test_existing_results_keep_initial_scale_and_values(self):
         executor = MigrationExecutor(connection)
         latest = executor.loader.graph.leaf_nodes()

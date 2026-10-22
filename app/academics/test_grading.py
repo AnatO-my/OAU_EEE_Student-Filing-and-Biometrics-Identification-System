@@ -6,7 +6,9 @@ from django.test import SimpleTestCase
 from .grading import grade_point_for_score
 
 
+# Verify score-to-point boundaries and score validation for the default grading scale.
 class GradingTests(SimpleTestCase):
+    # Check lower-inclusive boundaries and the special inclusive score of 100.
     def test_grade_boundaries(self):
         cases = [
             ("0", "0"),
@@ -30,12 +32,14 @@ class GradingTests(SimpleTestCase):
                     Decimal(expected),
                 )
 
+    # Reject values below zero or above the permitted maximum.
     def test_scores_outside_valid_range_are_rejected(self):
         for score in ("-0.01", "100.01"):
             with self.subTest(score=score):
                 with self.assertRaises(ValidationError):
                     grade_point_for_score(Decimal(score))
 
+    # Refuse missing, non-Decimal, and non-finite score inputs.
     def test_missing_or_invalid_scores_are_rejected(self):
         for score in (
             None,

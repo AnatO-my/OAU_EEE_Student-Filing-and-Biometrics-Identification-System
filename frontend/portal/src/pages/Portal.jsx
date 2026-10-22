@@ -706,10 +706,10 @@ function PortalContent({ role, section, notify }) {
     return <><PageHeading eyebrow="Advising" title="Advising records" description="Record guidance and follow-up actions. Keep notes relevant and visible only to authorised roles."/><div className="grid gap-5 xl:grid-cols-2"><Panel title="Recent advising notes"><DataTable headers={["Student", "Note", "Follow-up", "Visibility"]} rows={[[ "EEE/2022/014", "Discussed outstanding courses", "Review next advising session", "Adviser / HOD" ], [ "EEE/2022/027", "Registration selection reviewed", "Await student update", "Adviser / HOD" ]]}/></Panel><DemoForm title="Record guidance" description="Use factual, concise notes and set follow-up expectations." fields={["Student matric number", "Details"]} submitLabel="Save advising note"/></div></>;
   }
 
-  return <><PageHeading eyebrow="Department portal" title="Page not available" description="This area may not be part of your role or has not been configured."/><Panel title="Check your access"><p className="text-sm text-slate-400">Choose another page from the navigation, or go to your dashboard.</p><Link className={`${primaryButton} mt-4 inline-flex`} to={`/demo/${role}/dashboard`}>Return to dashboard</Link></Panel></>;
+  return <><PageHeading eyebrow="Department portal" title="Page not available" description="This area may not be part of your role or has not been configured."/><Panel title="Check your access"><p className="text-sm text-slate-400">Choose another page from the navigation, or go to your dashboard.</p><Link className={`${primaryButton} mt-4 inline-flex`} to={`/portal/${role}/dashboard`}>Return to dashboard</Link></Panel></>;
 }
 
-export default function DemoPortal() {
+export default function Portal() {
   const { role: requestedRole = "student", section: requestedSection = "dashboard" } = useParams();
   const navigate = useNavigate();
   const role = Object.hasOwn(roles, requestedRole) ? requestedRole : "student";
@@ -717,10 +717,10 @@ export default function DemoPortal() {
   const section = menu.some(([key]) => key === requestedSection) ? requestedSection : "dashboard";
   const currentLabel = menu.find(([key]) => key === section)?.[1] || "Dashboard";
 
-  const changeRole = (event) => navigate(`/demo/${event.target.value}/dashboard`);
-  const navigateTo = (targetSection) => navigate(`/demo/${role}/${targetSection}`);
+  const changeRole = (event) => navigate(`/portal/${event.target.value}/dashboard`);
+  const navigateTo = (targetSection) => navigate(`/portal/${role}/${targetSection}`);
   const logout = () => {
-    toast.info("Leaving the demo. Your account session is managed separately.", { position: "top-center" });
+    toast.info("Demo portal: no authenticated session is active.", { position: "top-center" });
     navigate("/");
   };
 
@@ -735,7 +735,7 @@ export default function DemoPortal() {
               {Object.entries(roles).map(([value, item]) => <option key={value} value={value}>{item.title}</option>)}
             </select>
             <Link to="/session-expired" className={secondaryButton}>Session help</Link>
-            <button className={secondaryButton} onClick={logout}>Exit demo</button>
+            <button className={secondaryButton} onClick={logout}>Log out</button>
           </div>
         </div>
 
@@ -744,7 +744,7 @@ export default function DemoPortal() {
             <p className="px-3 pb-3 pt-2 text-xs font-bold uppercase tracking-[0.18em] text-slate-500">Workspace</p>
             <nav className="flex gap-2 overflow-x-auto lg:flex-col">
               {menu.map(([key, label]) => (
-                <Link key={key} to={`/demo/${role}/${key}`} aria-current={section === key ? "page" : undefined} className={`shrink-0 rounded-xl px-3 py-2.5 text-sm transition lg:shrink ${section === key ? "bg-blue-600 font-semibold text-white" : "text-slate-300 hover:bg-slate-800 hover:text-white"}`}>
+                <Link key={key} to={`/portal/${role}/${key}`} aria-current={section === key ? "page" : undefined} className={`shrink-0 rounded-xl px-3 py-2.5 text-sm transition lg:shrink ${section === key ? "bg-blue-600 font-semibold text-white" : "text-slate-300 hover:bg-slate-800 hover:text-white"}`}>
                   {label}
                 </Link>
               ))}

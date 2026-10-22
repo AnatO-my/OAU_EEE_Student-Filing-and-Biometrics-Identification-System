@@ -32,11 +32,14 @@ from .services import (
 from .access import ResultAccessPermission, academic_students_for
 
 
+# Limit result querysets to the students visible to this user.
 def results_for(user):
     return Result.objects.filter(student__in=academic_students_for(user))
 
 
+# Restrict HOD-only endpoints to active staff superusers.
 class IsActiveHOD(permissions.BasePermission):
+    # Check the complete account state required for HOD operations.
     def has_permission(self, request, view):
         user = request.user
         return (
@@ -47,13 +50,16 @@ class IsActiveHOD(permissions.BasePermission):
         )
 
 
+# Keep administrative result listings to a predictable page size.
 class ResultPagination(PageNumberPagination):
     page_size = 20
 
 
+# Create results and list accessible results with optional filters.
 class ResultCreateView(APIView):
     permission_classes = [ResultAccessPermission]
 
+    # Validate and create a new unverified result through the transactional service.
     def post(self, request):
         serializer = ResultCreateSerializer(data=request.data, context={"request": request})
         serializer.is_valid(raise_exception=True)
@@ -73,6 +79,7 @@ class ResultCreateView(APIView):
             status=status.HTTP_201_CREATED,
         )
 
+    # Return a paginated result list constrained by access and validated filters.
     def get(self, request):
         filters = ResultFilterSerializer(data=request.query_params)
         filters.is_valid(raise_exception=True)
@@ -101,9 +108,11 @@ class ResultCreateView(APIView):
         return paginator.get_paginated_response(serializer.data)
 
 
+# Retrieve or correct a result while preserving its access and verification rules.
 class ResultScoreUpdateView(APIView):
     permission_classes = [ResultAccessPermission]
 
+    # Apply a score correction and return the updated result representation.
     def patch(self, request, result_id):
         result = get_object_or_404(results_for(request.user), pk=result_id)
 
@@ -123,6 +132,7 @@ class ResultScoreUpdateView(APIView):
 
         return Response(ResultSerializer(result).data)
 
+    # Retrieve one result only when it belongs to the user's accessible students.
     def get(self, request, result_id):
         result = get_object_or_404(
             results_for(request.user).select_related(
@@ -135,10 +145,12 @@ class ResultScoreUpdateView(APIView):
         return Response(ResultSerializer(result).data)
 
 
+# Confirm the reviewed score of an accessible result.
 class ResultVerifyView(APIView):
     permission_classes = [ResultAccessPermission]
     result_action = "verify_result"
 
+    # Verify a result against the score explicitly submitted by the reviewer.
     def post(self, request, result_id):
         result = get_object_or_404(results_for(request.user), pk=result_id)
 
@@ -159,9 +171,11 @@ class ResultVerifyView(APIView):
         return Response(ResultSerializer(result).data)
 
 
+# Return a student's GPA for a validated academic session and semester.
 class StudentGPAView(APIView):
     permission_classes = [ResultAccessPermission]
 
+    # Calculate GPA only for a student visible to the requesting user.
     def get(self, request, student_id):
         student = get_object_or_404(academic_students_for(request.user), pk=student_id)
 
@@ -192,9 +206,11 @@ class StudentGPAView(APIView):
         )
 
 
+# Return cumulative GPA and whether the latest history has HOD review.
 class StudentCGPAView(APIView):
     permission_classes = [ResultAccessPermission]
 
+    # Calculate CGPA and compare any saved graduation-review digest to current history.
     def get(self, request, student_id):
         student = get_object_or_404(academic_students_for(request.user), pk=student_id)
         try:
@@ -217,6 +233,7 @@ class StudentCGPAView(APIView):
         })
 
 
+# Resolve the authenticated non-staff user's linked, active student record.
 def own_student(request):
     # Never accept a student identifier supplied by the client here.
     return get_object_or_404(
@@ -225,42 +242,51 @@ def own_student(request):
     )
 
 
+# Provide the current student's GPA without accepting a client-supplied student ID.
 class MyGPAView(StudentGPAView):
     permission_classes = [permissions.IsAuthenticated]
 
+    # Reuse the staff-facing GPA calculation for the linked student only.
     def get(self, request):
         student = own_student(request)
         return super().get(request, student.pk)
 
 
+# Provide the current student's cumulative GPA without exposing other records.
 class MyCGPAView(StudentCGPAView):
     permission_classes = [permissions.IsAuthenticated]
 
+    # Reuse the CGPA calculation for the linked student only.
     def get(self, request):
         student = own_student(request)
         return super().get(request, student.pk)
 
 
+# List only verified results belonging to the authenticated student's own record.
 class MyResultsView(generics.ListAPIView):
     permission_classes = [permissions.IsAuthenticated]
     serializer_class = ResultSerializer
     pagination_class = ResultPagination
 
+    # Resolve the linked student and exclude unverified results from self-service output.
     def get_queryset(self):
         student = own_student(self.request)
         return student.results.filter(is_verified=True).order_by("pk")
 
 
+# Retrieve an individual verified result from the authenticated student's record.
 class MyResultDetailView(generics.RetrieveAPIView):
     permission_classes = [permissions.IsAuthenticated]
     serializer_class = ResultSerializer
     lookup_url_kwarg = "result_id"
 
+    # Scope detail lookup to the linked student's verified results.
     def get_queryset(self):
         student = own_student(self.request)
         return student.results.filter(is_verified=True)
 
 
+# Let HODs list and create validated academic sessions.
 class AcademicSessionListCreateView(generics.ListCreateAPIView):
     permission_classes = [IsActiveHOD]
     serializer_class = AcademicSessionSerializer
@@ -268,6 +294,7 @@ class AcademicSessionListCreateView(generics.ListCreateAPIView):
     queryset = AcademicSession.objects.order_by("name")
 
 
+# Let HODs manage the ordered course catalogue.
 class CourseListCreateView(generics.ListCreateAPIView):
     permission_classes = [IsActiveHOD]
     serializer_class = CourseSerializer
@@ -275,6 +302,7 @@ class CourseListCreateView(generics.ListCreateAPIView):
     queryset = Course.objects.order_by("code")
 
 
+# Let HODs manage course offerings with related course and session data loaded.
 class CourseOfferingListCreateView(generics.ListCreateAPIView):
     permission_classes = [IsActiveHOD]
     serializer_class = CourseOfferingSerializer
@@ -291,14 +319,17 @@ def run_academic_service(service, **kwargs):
         raise ValidationError(detail) from exc
 
 
+# List grading versions and create validated unpublished drafts.
 class GradingScaleListCreateView(APIView):
     permission_classes = [IsActiveHOD]
 
+    # Return a paginated list of all grading versions.
     def get(self, request):
         paginator = ResultPagination()
         page = paginator.paginate_queryset(GradingScale.objects.order_by("pk"), request)
         return paginator.get_paginated_response(GradingScaleSerializer(page, many=True).data)
 
+    # Validate and create a new grading-scale draft.
     def post(self, request):
         serializer = GradingScaleWriteSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -307,12 +338,15 @@ class GradingScaleListCreateView(APIView):
         return Response(GradingScaleSerializer(scale).data, status=status.HTTP_201_CREATED)
 
 
+# Retrieve a grading version or update it while it remains an editable draft.
 class GradingScaleDetailView(APIView):
     permission_classes = [IsActiveHOD]
 
+    # Return the requested scale for HOD review.
     def get(self, request, scale_id):
         return Response(GradingScaleSerializer(get_object_or_404(GradingScale, pk=scale_id)).data)
 
+    # Validate a partial edit and delegate publication-lock enforcement to the service.
     def patch(self, request, scale_id):
         scale = get_object_or_404(GradingScale, pk=scale_id)
         serializer = GradingScaleWriteSerializer(data=request.data, partial=True)
@@ -322,18 +356,22 @@ class GradingScaleDetailView(APIView):
         return Response(GradingScaleSerializer(scale).data)
 
 
+# Publish a validated draft scale for use by course offerings.
 class GradingScalePublishView(APIView):
     permission_classes = [IsActiveHOD]
 
+    # Publish the selected scale through the HOD-only service.
     def post(self, request, scale_id):
         scale = run_academic_service(publish_grading_scale, user=request.user,
                                     scale=get_object_or_404(GradingScale, pk=scale_id))
         return Response(GradingScaleSerializer(scale).data)
 
 
+# Assign a published grading version to an offering that has no results.
 class OfferingScaleUpdateView(APIView):
     permission_classes = [IsActiveHOD]
 
+    # Validate the scale selection and return the updated offering.
     def patch(self, request, offering_id):
         offering = get_object_or_404(CourseOffering, pk=offering_id)
         serializer = OfferingScaleSerializer(data=request.data)
@@ -343,32 +381,39 @@ class OfferingScaleUpdateView(APIView):
         return Response(CourseOfferingSerializer(offering).data)
 
 
+# List or record HOD-reviewed course requirements for one student.
 class CourseRequirementListCreateView(generics.ListCreateAPIView):
     permission_classes = [IsActiveHOD]
     serializer_class = CourseRequirementSerializer
     pagination_class = ResultPagination
 
+    # Resolve the student scoped by the route before querying or creating requirements.
     def parent(self):
         return get_object_or_404(Student, pk=self.kwargs["student_id"])
 
+    # Return only the requirements belonging to the route's student.
     def get_queryset(self):
         return self.parent().course_requirements.order_by("pk")
 
+    # Create a requirement through the locked service with the current HOD as recorder.
     def perform_create(self, serializer):
         from .graduation import save_course_requirement
         serializer.instance = run_academic_service(save_course_requirement,
             user=self.request.user, student=self.parent(), validated_data=serializer.validated_data)
 
 
+# Retrieve or partially update one requirement within its student route.
 class CourseRequirementDetailView(generics.RetrieveUpdateAPIView):
     permission_classes = [IsActiveHOD]
     serializer_class = CourseRequirementSerializer
     lookup_url_kwarg = "requirement_id"
     http_method_names = ["get", "patch", "head", "options"]
 
+    # Restrict lookup to requirements for the route's student.
     def get_queryset(self):
         return CourseRequirement.objects.filter(student_id=self.kwargs["student_id"])
 
+    # Apply requirement changes through the graduation workflow service.
     def perform_update(self, serializer):
         from .graduation import save_course_requirement
         serializer.instance = run_academic_service(save_course_requirement,
@@ -376,9 +421,11 @@ class CourseRequirementDetailView(generics.RetrieveUpdateAPIView):
             requirement=serializer.instance, validated_data=serializer.validated_data)
 
 
+# Preview academic-history completeness and record a matching HOD approval.
 class GraduationReviewView(APIView):
     permission_classes = [IsActiveHOD]
 
+    # Lock the student while generating a digest and returning the current review state.
     def get(self, request, student_id):
         from .graduation import reviewed_history
         from django.db import transaction
@@ -391,6 +438,7 @@ class GraduationReviewView(APIView):
                 "history_digest": digest, "review_current": bool(review and review.history_digest == digest),
                 "review": GraduationReviewSerializer(review).data if review else None})
 
+    # Validate HOD confirmations and approve only the reviewed history digest.
     def post(self, request, student_id):
         from .graduation import approve_graduation
         student = get_object_or_404(Student, pk=student_id)

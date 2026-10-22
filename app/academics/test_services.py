@@ -15,7 +15,9 @@ from .calculations import (
 )
 
 
+# Verify result-service creation, edits, verification, permissions, and GPA calculations.
 class ResultCreationTests(TestCase):
+    # Prepare the HOD, staff member, student, and initial course offering.
     def setUp(self):
         User = get_user_model()
 
@@ -50,6 +52,7 @@ class ResultCreationTests(TestCase):
             credit_units=3,
         )
 
+    # Create a result with HOD/student/offering defaults and caller-supplied overrides.
     def create(self, **overrides):
         arguments = {
             "user": self.hod,
@@ -60,6 +63,7 @@ class ResultCreationTests(TestCase):
         arguments.update(overrides)
         return create_result(**arguments)
 
+    # Copy offering units into a new result and leave it unverified.
     def test_units_are_copied_and_result_starts_unverified(self):
         result = self.create()
 
@@ -74,18 +78,21 @@ class ResultCreationTests(TestCase):
         result.refresh_from_db()
         self.assertEqual(result.credit_units, 3)
 
+    # Reject result creation by ordinary staff without persisting a row.
     def test_ordinary_staff_cannot_create_results_yet(self):
         with self.assertRaises(PermissionDenied):
             self.create(user=self.staff)
 
         self.assertFalse(Result.objects.exists())
 
+    # Reject an invalid score before storing a result.
     def test_invalid_score_is_not_saved(self):
         with self.assertRaises(ValidationError):
             self.create(score=Decimal("100.01"))
 
         self.assertFalse(Result.objects.exists())
 
+    # Keep the original attempt unchanged when a duplicate attempt is submitted.
     def test_duplicate_attempt_does_not_overwrite_result(self):
         original = self.create()
 
@@ -96,6 +103,7 @@ class ResultCreationTests(TestCase):
         self.assertEqual(original.score, Decimal("68.00"))
         self.assertEqual(Result.objects.count(), 1)
 
+    # Preserve an omitted score as null and leave its result unverified.
     def test_missing_score_remains_missing(self):
         result = self.create(score=None)
 
@@ -103,6 +111,7 @@ class ResultCreationTests(TestCase):
         self.assertIsNone(result.score)
         self.assertFalse(result.is_verified)
 
+    # Reset verification after score changes while preserving original credit units.
     def test_score_correction_resets_verification_and_preserves_units(self):
         result = self.create()
         result.is_verified = True
@@ -122,6 +131,7 @@ class ResultCreationTests(TestCase):
         self.assertFalse(result.is_verified)
         self.assertEqual(result.credit_units, 3)
 
+    # Preserve existing verification when a correction supplies the same score.
     def test_unchanged_score_preserves_verification(self):
         result = self.create()
         result.is_verified = True
@@ -136,6 +146,7 @@ class ResultCreationTests(TestCase):
         result.refresh_from_db()
         self.assertTrue(result.is_verified)
 
+    # Keep saved score and verification unchanged after an invalid correction.
     def test_invalid_correction_preserves_existing_result(self):
         result = self.create()
         result.is_verified = True
@@ -152,6 +163,7 @@ class ResultCreationTests(TestCase):
         self.assertEqual(result.score, Decimal("68.00"))
         self.assertTrue(result.is_verified)
 
+    # Deny score corrections by ordinary staff without changing the result.
     def test_ordinary_staff_cannot_correct_results_yet(self):
         result = self.create()
 
@@ -165,6 +177,7 @@ class ResultCreationTests(TestCase):
         result.refresh_from_db()
         self.assertEqual(result.score, Decimal("68.00"))
 
+    # Allow the HOD to verify a result against the score they reviewed.
     def test_hod_can_verify_reviewed_score(self):
         result = self.create()
 
@@ -177,6 +190,7 @@ class ResultCreationTests(TestCase):
         result.refresh_from_db()
         self.assertTrue(result.is_verified)
 
+    # Reject verification if the stored score changed after the submitted review value.
     def test_changed_score_requires_another_review(self):
         result = self.create()
 
@@ -197,6 +211,7 @@ class ResultCreationTests(TestCase):
         self.assertEqual(result.score, Decimal("75.00"))
         self.assertFalse(result.is_verified)
 
+    # Refuse verification when the result has no saved score.
     def test_missing_score_cannot_be_verified(self):
         result = self.create(score=None)
 
@@ -210,6 +225,7 @@ class ResultCreationTests(TestCase):
         result.refresh_from_db()
         self.assertFalse(result.is_verified)
 
+    # Deny result verification by ordinary staff.
     def test_ordinary_staff_cannot_verify_results_yet(self):
         result = self.create()
 
@@ -223,6 +239,7 @@ class ResultCreationTests(TestCase):
         result.refresh_from_db()
         self.assertFalse(result.is_verified)
 
+    # Treat zero as a valid score that can be explicitly verified.
     def test_zero_score_can_be_verified(self):
         result = self.create(score=Decimal("0.00"))
 
@@ -235,6 +252,7 @@ class ResultCreationTests(TestCase):
         result.refresh_from_db()
         self.assertTrue(result.is_verified)
 
+    # Include failed attempts and repeats in the saved-result CGPA calculation.
     def test_saved_failed_attempt_and_repeat_both_count_in_cgpa(self):
         failed = self.create(score=Decimal("30.00"))
         repeat = self.create(
@@ -254,11 +272,13 @@ class ResultCreationTests(TestCase):
             Decimal("2.5"),
         )
 
+    # Return no CGPA when a student has no recorded results.
     def test_student_without_results_has_no_cgpa(self):
         self.assertIsNone(
             calculate_student_cgpa(student=self.student)
         )
 
+    # Refuse CGPA when any recorded attempt remains unverified.
     def test_unverified_attempt_blocks_student_cgpa(self):
         verified = self.create(score=Decimal("70.00"))
         verify_result(
@@ -274,6 +294,7 @@ class ResultCreationTests(TestCase):
 
         with self.assertRaises(ValidationError):
             calculate_student_cgpa(student=self.student)
+    # Restrict GPA to the requested session and semester without unrelated attempts.
     def test_gpa_excludes_other_sessions_and_semesters(self):
         current = self.create(score=Decimal("70.00"))
         verify_result(
@@ -319,6 +340,7 @@ class ResultCreationTests(TestCase):
             Decimal("5"),
         )
 
+    # Return no GPA when the selected semester has no results.
     def test_semester_without_results_has_no_gpa(self):
         self.assertIsNone(
             calculate_student_gpa(
@@ -328,6 +350,7 @@ class ResultCreationTests(TestCase):
             )
         )
 
+    # Reject GPA requests whose semester is not a supported choice.
     def test_invalid_semester_is_rejected(self):
         with self.assertRaises(ValidationError):
             calculate_student_gpa(

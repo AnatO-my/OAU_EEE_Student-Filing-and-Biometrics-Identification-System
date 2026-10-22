@@ -12,6 +12,7 @@ from .models import CourseRequirement, GraduationReview
 from .services import require_hod
 
 
+# Validate required coursework and fingerprint the exact results and requirements reviewed.
 def reviewed_history(student):
     results = list(student.results.select_related("grading_scale").order_by("pk"))
     requirements = list(student.course_requirements.order_by("pk"))
@@ -39,6 +40,7 @@ def reviewed_history(student):
 
 
 @transaction.atomic
+# Save an HOD's approval only if the academic history still matches the reviewed preview.
 def approve_graduation(*, user, student, notes, expected_digest):
     require_hod(user)
     student = Student.objects.select_for_update().get(pk=student.pk)
@@ -54,6 +56,7 @@ def approve_graduation(*, user, student, notes, expected_digest):
     return review
 
 
+# Block graduation unless the current academic-history digest has an HOD approval.
 def require_graduation_ready(student):
     cgpa, digest = reviewed_history(student)
     review = GraduationReview.objects.filter(student=student).first()
@@ -63,6 +66,7 @@ def require_graduation_ready(student):
 
 
 @transaction.atomic
+# Create or update an HOD-recorded course requirement under a student row lock.
 def save_course_requirement(*, user, student, validated_data, requirement=None):
     require_hod(user)
     student = Student.objects.select_for_update().get(pk=student.pk)

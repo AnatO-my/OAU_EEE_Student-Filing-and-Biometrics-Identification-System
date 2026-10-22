@@ -12,33 +12,33 @@ function show(path = '/reset-password?uid=MQ&token=synthetic-token') {
 }
 describe('password reset completion', () => {
   it('posts the email-link credentials and clears the URL after success', async () => {
-    confirmPasswordReset.mockResolvedValue({}); show();
+    confirmPasswordReset.mockResolvedValue({ detail: 'Password reset.' }); show();
     fireEvent.change(screen.getByLabelText('New password'), { target: { value: 'New-pass-123' } });
     fireEvent.change(screen.getByLabelText('Confirm new password'), { target: { value: 'New-pass-123' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Set new password' }));
-    await screen.findByText('Password reset. Sign in with your new password.');
+    fireEvent.click(screen.getByRole('button', { name: 'Reset password' }));
+    await screen.findByText('Your password has been reset.');
     expect(confirmPasswordReset).toHaveBeenCalledWith('MQ', 'synthetic-token', 'New-pass-123');
     await waitFor(() => expect(screen.getByTestId('location').textContent).toBe(''));
   });
   it('keeps invalid/expired server errors visible', async () => {
-    confirmPasswordReset.mockRejectedValue(new Error('The reset link is invalid or expired.')); show();
+    confirmPasswordReset.mockRejectedValue(Object.assign(new Error('The reset link is invalid or expired.'), { status: 400 })); show();
     fireEvent.change(screen.getByLabelText('New password'), { target: { value: 'New-pass-123' } });
     fireEvent.change(screen.getByLabelText('Confirm new password'), { target: { value: 'New-pass-123' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Set new password' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Reset password' }));
     expect((await screen.findByRole('alert')).textContent).toContain('invalid or expired');
   });
   it('does not show a submit form for incomplete reset links', () => {
     show('/reset-password?uid=MQ');
     expect(screen.getByRole('alert').textContent).toContain('incomplete');
-    expect(screen.queryByRole('button', { name: 'Set new password' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Reset password' })).toBeNull();
   });
   it('completes links sent to the older recover-password route', async () => {
-    confirmPasswordReset.mockResolvedValue({});
+    confirmPasswordReset.mockResolvedValue({ detail: 'Password reset.' });
     render(<MemoryRouter initialEntries={['/recover-password?uid=MQ&token=synthetic-token']}><Routes><Route path="/recover-password" element={<PortalNotice />} /><Route path="/reset-password" element={<ResetPassword />} /></Routes><Location /></MemoryRouter>);
     fireEvent.change(await screen.findByLabelText('New password'), { target: { value: 'New-pass-123' } });
     fireEvent.change(screen.getByLabelText('Confirm new password'), { target: { value: 'New-pass-123' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Set new password' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Reset password' }));
     await waitFor(() => expect(screen.getByTestId('location').textContent).toBe(''));
-    expect(screen.getByText('Password reset. Sign in with your new password.')).toBeTruthy();
+    expect(screen.getByText('Your password has been reset.')).toBeTruthy();
   });
 });

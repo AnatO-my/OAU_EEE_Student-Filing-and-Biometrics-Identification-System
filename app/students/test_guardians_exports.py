@@ -10,8 +10,10 @@ from accounts.models import User, AdviserAssignment
 from .models import Student, Guardian
 
 
+# Exercise guardian scope and the separate, sanitized student export endpoint.
 @override_settings(CURRENT_ACADEMIC_SESSION="2026/2027")
 class GuardianAndExportTests(APITestCase):
+    # Create an HOD, assigned adviser, scoped students, and guardian payload.
     def setUp(self):
         self.hod = User.objects.create_superuser("guardian-hod", "hod@example.test", "Example!1982-Birch")
         self.staff = User.objects.create_user("guardian-adviser", is_staff=True)
@@ -21,14 +23,17 @@ class GuardianAndExportTests(APITestCase):
         AdviserAssignment.objects.create(staff=self.staff, academic_session="2026/2027", level=300)
         self.payload = {"full_name": "Example Guardian", "phone_number": "08000000001", "relationship": "Parent"}
 
+    # Grant student permissions and authenticate the test adviser.
     def grant(self, *codes):
         self.staff.user_permissions.add(*Permission.objects.filter(content_type__app_label="students", codename__in=codes))
         self.staff = User.objects.get(pk=self.staff.pk)
         self.client.force_authenticate(self.staff)
 
+    # Build the guardian-list URL for a selected student.
     def url(self, student=None):
         return reverse("guardian-list", kwargs={"student_id": (student or self.students[0]).pk})
 
+    # Ensure advisers can edit guardians without changing the parent student.
     def test_assigned_staff_can_create_and_edit_without_relinking(self):
         self.grant("view_student", "view_guardian", "add_guardian", "change_guardian")
         response = self.client.post(self.url(), {**self.payload, "student": str(self.students[1].pk)}, format="json")
@@ -42,6 +47,7 @@ class GuardianAndExportTests(APITestCase):
         self.assertEqual(guardian.full_name, "Corrected")
         self.assertEqual(guardian.student_id, self.students[0].pk)
 
+    # Hide guardians and parent records when the adviser lacks student scope.
     def test_out_of_scope_parent_and_detail_return_404(self):
         guardian = Guardian.objects.create(student=self.students[1], **self.payload)
         self.grant("view_student", "view_guardian", "add_guardian", "change_guardian")
@@ -51,25 +57,30 @@ class GuardianAndExportTests(APITestCase):
         self.assertEqual(self.client.get(detail).status_code, 404)
         self.assertEqual(self.client.patch(detail, {"full_name": "Bad"}, format="json").status_code, 404)
 
+    # Confirm view permissions alone do not authorize guardian writes.
     def test_read_permission_does_not_grant_guardian_writes(self):
         self.grant("view_student", "view_guardian")
         self.assertEqual(self.client.get(self.url()).status_code, 200)
         self.assertEqual(self.client.post(self.url(), self.payload, format="json").status_code, 403)
         self.assertFalse(Guardian.objects.exists())
 
+    # Ensure revoking the adviser assignment removes guardian access.
     def test_revoked_assignment_blocks_guardian_access(self):
         self.grant("view_student", "view_guardian", "add_guardian")
         AdviserAssignment.objects.filter(staff=self.staff).update(is_active=False)
         self.assertEqual(self.client.get(self.url()).status_code, 404)
         self.assertEqual(self.client.post(self.url(), self.payload, format="json").status_code, 404)
 
+    # Deny guardian creation to authenticated student accounts.
     def test_student_cannot_write_guardian_records(self):
         self.client.force_authenticate(User.objects.create_user("guardian-student"))
         self.assertEqual(self.client.post(self.url(), self.payload, format="json").status_code, 403)
 
+    # Parse streamed CSV response content into rows for assertions.
     def export_rows(self, response):
         return list(csv.DictReader(io.StringIO(b"".join(response.streaming_content).decode())))
 
+    # Require explicit export permission while keeping adviser scope intact.
     def test_export_requires_separate_permission_and_preserves_scope(self):
         self.grant("view_student")
         url = reverse("student-export")
@@ -82,6 +93,7 @@ class GuardianAndExportTests(APITestCase):
         self.assertNotIn("user", rows[0])
         self.assertNotIn("guardian", rows[0])
 
+    # Verify list filters apply and spreadsheet formulas are neutralized.
     def test_export_search_filters_and_formula_protection(self):
         self.students[0].full_name = "=DangerousCell()"
         self.students[0].save(update_fields=["full_name"])
@@ -92,6 +104,7 @@ class GuardianAndExportTests(APITestCase):
         self.assertEqual(rows[0]["full_name"], "'=DangerousCell()")
         self.assertEqual(response["Cache-Control"], "no-store")
 
+    # Reject malformed student filters passed to the export endpoint.
     def test_invalid_export_filter_returns_400(self):
         self.client.force_authenticate(self.hod)
         self.assertEqual(self.client.get(reverse("student-export"), {"current_level": "invalid"}).status_code, 400)

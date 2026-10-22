@@ -9,6 +9,7 @@ from accounts.models import AdviserAssignment
 from .models import Guardian, Student
 
 
+# Cover student API permissions, scoping, filtering, and profile behavior.
 @override_settings(CURRENT_ACADEMIC_SESSION="2026/2027")
 class StudentAPItests(TestCase):
 
@@ -569,6 +570,7 @@ class StudentAPItests(TestCase):
         )
 
 
+# Verify surnames remain explicit model data and stay out of student APIs.
 @override_settings(CURRENT_ACADEMIC_SESSION="2026/2027")
 class StudentSurnameFieldTests(TestCase):
     #the surname is stored on its own because it doubles as the student's

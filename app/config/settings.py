@@ -94,9 +94,10 @@ INSTALLED_APPS = [
     "rest_framework",
     "students.apps.StudentsConfig",
     "accounts.apps.AccountsConfig",
-    "documents.apps.DocumentsConfig",
     "academics.apps.AcademicsConfig",
     "attendance.apps.AttendanceConfig",
+    "record_imports.apps.RecordImportsConfig",
+    "documents.apps.DocumentsConfig",
 ]
 
 MIDDLEWARE = [
@@ -182,6 +183,13 @@ STATIC_URL = "static/"
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
+# Student documents are private and must never be served as public static files.
+PRIVATE_MEDIA_ROOT = os.environ.get("PRIVATE_MEDIA_ROOT") or str(BASE_DIR / "private_media")
+DOCUMENT_MAX_UPLOAD_BYTES = 10 * 1024 * 1024
+DOCUMENT_OCR_MIN_CONFIDENCE = 60
+DOCUMENT_OCR_MIN_CHARACTERS = 50
+DOCUMENT_OCR_BACKEND = "documents.ocr.placeholder_extract_text"
+
 # Production requires a stable secret and deployment-specific settings.
 if not DEBUG and not os.environ.get("DJANGO_SECRET_KEY"):
     raise RuntimeError("Set DJANGO_SECRET_KEY when DEBUG is disabled.")
@@ -199,16 +207,6 @@ CURRENT_ACADEMIC_SESSION = os.environ.get(
     "CURRENT_ACADEMIC_SESSION",
     "",
 )
-# Uploaded documents are private: stored outside any publicly served folder.
-PRIVATE_MEDIA_ROOT = os.environ.get(
-    "PRIVATE_MEDIA_ROOT", str(BASE_DIR / "private_media")
-)
-DOCUMENT_MAX_UPLOAD_BYTES = 10 * 1024 * 1024  # proposed limit: 10 MB
-# Quality gate thresholds (tune on real result sheets once OCR is connected).
-DOCUMENT_OCR_MIN_CONFIDENCE = 60  # percent
-DOCUMENT_OCR_MIN_CHARACTERS = 50
-# Dotted path of the OCR function; see documents/ocr.py for the contract.
-DOCUMENT_OCR_BACKEND = "documents.ocr.placeholder_extract_text"
 
 
 # React uses a same-origin /api proxy; no permissive CORS middleware is enabled.
@@ -217,6 +215,7 @@ SESSION_COOKIE_SAMESITE = "Lax"
 SESSION_COOKIE_SECURE = SESSION_COOKIE_SECURE or not DEBUG
 CSRF_COOKIE_SECURE = CSRF_COOKIE_SECURE or not DEBUG
 PASSWORD_RESET_FRONTEND_URL = os.environ.get("PASSWORD_RESET_FRONTEND_URL", "")
+STUDENT_ACCOUNT_FRONTEND_ORIGIN = os.environ.get("STUDENT_ACCOUNT_FRONTEND_ORIGIN", "")
 PASSWORD_RESET_TIMEOUT = 3600
 EMAIL_BACKEND = os.environ.get("DJANGO_EMAIL_BACKEND", "django.core.mail.backends.console.EmailBackend" if DEBUG else "django.core.mail.backends.smtp.EmailBackend")
 EMAIL_HOST = os.environ.get("DJANGO_EMAIL_HOST", "localhost")
@@ -224,9 +223,10 @@ EMAIL_PORT = int(os.environ.get("DJANGO_EMAIL_PORT", "587"))
 EMAIL_HOST_USER = os.environ.get("DJANGO_EMAIL_HOST_USER", "")
 EMAIL_HOST_PASSWORD = os.environ.get("DJANGO_EMAIL_HOST_PASSWORD", "")
 EMAIL_USE_TLS = os.environ.get("DJANGO_EMAIL_USE_TLS", "true").lower() == "true"
+EMAIL_SMTP_AUTH_METHOD = os.environ.get("DJANGO_EMAIL_AUTH_METHOD", "auto")
 DEFAULT_FROM_EMAIL = os.environ.get("DJANGO_DEFAULT_FROM_EMAIL", "noreply@example.invalid")
 REST_FRAMEWORK["DEFAULT_THROTTLE_RATES"] = {
-    "password_reset": "20/hour", "password_reset_confirm": "60/hour",
+    "password_reset": "20/hour", "password_reset_confirm": "60/hour", "student_setup_confirm": "60/hour",
 }
 
 
@@ -238,4 +238,3 @@ WHATSAPP_PHONE_NUMBER_ID = os.environ.get("WHATSAPP_PHONE_NUMBER_ID", "")
 WHATSAPP_API_VERSION = os.environ.get("WHATSAPP_API_VERSION", "")
 WHATSAPP_RESULT_TEMPLATE = os.environ.get("WHATSAPP_RESULT_TEMPLATE", "")
 WHATSAPP_TEMPLATE_LANGUAGE = os.environ.get("WHATSAPP_TEMPLATE_LANGUAGE", "")
-

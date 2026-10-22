@@ -7,8 +7,10 @@ from accounts.models import AdviserAssignment
 from students.models import Student
 from .models import StudentDocument
 from django.test import SimpleTestCase
+from unittest.mock import patch
 from .ocr import OcrResult
 from .services import assess_quality
+from .test_storage import isolate_document_storage
 
 
 
@@ -27,6 +29,7 @@ def blurry_scan_ocr(path):
 @override_settings(CURRENT_ACADEMIC_SESSION="2026/2027")
 class UploadTests(TestCase):
     def setUp(self):
+        self.storage_root = isolate_document_storage(self)
         self.client = APIClient()
         self.staff = get_user_model().objects.create_user(
             username="example-uploader",
@@ -67,6 +70,59 @@ class UploadTests(TestCase):
         response = self.post_pdf()
         self.assertEqual(response.status_code, 201)
         self.assertEqual(StudentDocument.objects.count(), 1)
+        document = StudentDocument.objects.get()
+        self.assertTrue(document.file.storage.path(document.file.name).startswith(str(self.storage_root)))
+        self.assertTrue(document.file.storage.exists(document.file.name))
+
+    def test_staff_deactivated_during_ocr_cannot_save_the_upload(self):
+        self.client.force_authenticate(self.staff)
+
+        def deactivate(path):
+            get_user_model().objects.filter(pk=self.staff.pk).update(is_active=False)
+            return clear_scan_ocr(path)
+
+        with patch("documents.services.run_ocr", side_effect=deactivate):
+            response = self.post_pdf()
+        self.assertEqual(response.status_code, 403)
+        self.assertEqual(StudentDocument.objects.count(), 0)
+        self.assertEqual(list(self.storage_root.rglob("*")), [])
+
+    def test_upload_permission_revoked_during_ocr_is_rechecked(self):
+        self.client.force_authenticate(self.staff)
+
+        def revoke(path):
+            self.staff.user_permissions.remove(Permission.objects.get(
+                content_type__app_label="documents", codename="add_studentdocument"))
+            return clear_scan_ocr(path)
+
+        with patch("documents.services.run_ocr", side_effect=revoke):
+            response = self.post_pdf()
+        self.assertEqual(response.status_code, 403)
+        self.assertEqual(StudentDocument.objects.count(), 0)
+
+    def test_assignment_removed_during_ocr_is_rechecked(self):
+        self.client.force_authenticate(self.staff)
+
+        def revoke(path):
+            AdviserAssignment.objects.filter(staff=self.staff).delete()
+            return clear_scan_ocr(path)
+
+        with patch("documents.services.run_ocr", side_effect=revoke):
+            response = self.post_pdf()
+        self.assertEqual(response.status_code, 404)
+        self.assertEqual(StudentDocument.objects.count(), 0)
+
+    def test_student_moved_during_ocr_is_rechecked(self):
+        self.client.force_authenticate(self.staff)
+
+        def move(path):
+            Student.objects.filter(pk=self.student.pk).update(current_level=100)
+            return clear_scan_ocr(path)
+
+        with patch("documents.services.run_ocr", side_effect=move):
+            response = self.post_pdf()
+        self.assertEqual(response.status_code, 404)
+        self.assertEqual(StudentDocument.objects.count(), 0)
 
     def test_anonymous_and_nonstaff_are_denied(self):
         self.assertEqual(self.post_pdf().status_code, 403)
@@ -160,4 +216,3 @@ class QualityGateTests(SimpleTestCase):
     def test_missing_confidence_is_judged_on_text_alone(self):
         decision = assess_quality(OcrResult(text="Course results " * 20))
         self.assertTrue(decision.accepted)
-   

@@ -126,5 +126,8 @@ check the operator's current adviser scope/add-result permission, show a preview
 and commit the approved batch atomically. Imported results start unverified.
 Existing student/offering/attempt matches must never be silently overwritten.
 The importer will enforce safe re-import behavior and preserve source provenance.
-It is not implemented yet; agree its request/response contract before wiring the
-converter to a live API. The converter does not need database credentials.
+The reviewed importer is implemented; see
+[student/result imports](student-result-imports.md) for the active API. The portal
+also prepares the existing converter's supported PDF layout and nested student
+CSV through shared parsing/adaptation code. It retains the review boundary before
+database writes. The converter does not need database credentials.

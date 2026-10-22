@@ -1,13 +1,31 @@
 from academics.session_context import current_session_name
 from django.conf import settings
 from django.core.exceptions import PermissionDenied
-from django.db import transaction
+from django.db import IntegrityError, transaction
 from rest_framework.exceptions import ValidationError
 
 from accounts.models import AdviserAssignment
 
 from .eligibility import validate_graduation_cgpa
-from .models import Guardian, Student
+from .models import Guardian, Student, StudentIdentityChange
+from .identity import identifier_key, identifier_is_unavailable
+
+
+def reject_unavailable_identifier(value, student_id=None):
+    if identifier_is_unavailable(value, student_id):
+        raise ValidationError({"identifier_value": "This identifier is unavailable. Check the entry or ask the HOD to review it."})
+
+
+def save_registered_student(student):
+    try:
+        with transaction.atomic():
+            student.save()
+    except IntegrityError:
+        # The shared registry and primary key uniqueness enforce the same rule
+        # when another registration/promotion wins after the preliminary lookup.
+        reject_unavailable_identifier(student.identifier_value, student.pk)
+        raise
+    return student
 
 
 # Return only active-session students visible under the user's staff role.
@@ -75,7 +93,8 @@ def create_student(*, user, validated_data):
         # A newly created student has no reviewed academic history.
         validate_graduation_cgpa(None)
 
-    return Student.objects.create(**validated_data)
+    reject_unavailable_identifier(validated_data["identifier_value"])
+    return save_registered_student(Student(**validated_data))
 
 
 # Update a locked student record while enforcing adviser and HOD boundaries.
@@ -88,6 +107,10 @@ def update_student(*, user, student, validated_data):
         raise PermissionDenied("You do not have permission to edit students.")
 
     student = Student.objects.select_for_update().get(pk=student.pk)
+
+    if (("identifier_type" in validated_data and validated_data["identifier_type"] != student.identifier_type)
+            or ("identifier_value" in validated_data and identifier_key(validated_data["identifier_value"]) != student.identifier_key)):
+        raise ValidationError({"identifier_value": "Use the HOD identifier-promotion action to change a student's identity."})
 
     target_status = validated_data.get(
         "academic_status",
@@ -148,7 +171,28 @@ def update_student(*, user, student, validated_data):
     for field, value in validated_data.items():
         setattr(student, field, value)
 
-    student.save()
+    return save_registered_student(student)
+
+
+@transaction.atomic
+def promote_student_identifier(*, user, student, identifier_value,
+                               expected_identifier_type, expected_identifier_value):
+    if not (user.is_authenticated and user.is_active and user.is_staff and user.is_superuser):
+        raise PermissionDenied("Only the active HOD may promote student identifiers.")
+    student = Student.objects.select_for_update().get(pk=student.pk)
+    if (student.identifier_type != expected_identifier_type or
+            student.identifier_key != identifier_key(expected_identifier_value)):
+        raise ValidationError("The student identity changed. Refresh the record before continuing.")
+    if student.identifier_type != Student.IdentifierType.UTME:
+        raise ValidationError("Only a UTME identifier can be promoted to a matriculation number.")
+    reject_unavailable_identifier(identifier_value, student.pk)
+    previous_type, previous_value = student.identifier_type, student.identifier_value
+    student.identifier_type = Student.IdentifierType.MATRICULATION
+    student.identifier_value = identifier_value.strip()
+    save_registered_student(student)
+    StudentIdentityChange.objects.create(student=student, previous_type=previous_type,
+        previous_value=previous_value, identifier_type=student.identifier_type,
+        identifier_value=student.identifier_value, actor=user)
     return student
 
 

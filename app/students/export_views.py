@@ -6,7 +6,9 @@ from rest_framework.permissions import BasePermission
 from .views import StudentListView
 
 
+# Require both student-view and explicit student-export permissions.
 class ExportStudentPermission(BasePermission):
+    # Exports are limited to authenticated, active staff with both permissions.
     def has_permission(self, request, view):
         user = request.user
         return (user.is_authenticated and user.is_active and user.is_staff
@@ -14,11 +16,14 @@ class ExportStudentPermission(BasePermission):
                 and user.has_perm("students.export_student"))
 
 
+# Provide csv.writer with a file-like target that returns each generated row.
 class Echo:
+    # Return a CSV chunk directly for streaming in the HTTP response.
     def write(self, value):
         return value
 
 
+# Convert values to safe CSV text, prefixing spreadsheet formula-like input.
 def spreadsheet_cell(value):
     if value is None:
         return ""
@@ -30,10 +35,12 @@ def spreadsheet_cell(value):
     return text
 
 
+# Stream the filtered student list using an explicit, fixed export field set.
 class StudentExportView(StudentListView):
     permission_classes = [ExportStudentPermission]
     http_method_names = ["get", "head", "options"]
 
+    # Build a no-store CSV response without buffering the complete student list.
     def get(self, request, *args, **kwargs):
         students = self.filter_queryset(self.get_queryset())
         # Explicit export policy: adding an API field must not silently export it.
@@ -44,6 +51,7 @@ class StudentExportView(StudentListView):
         )
         writer = csv.writer(Echo())
 
+        # Yield the header and each sanitized record as the client consumes it.
         def rows():
             yield writer.writerow(fields)
             for student in students.iterator(chunk_size=500):

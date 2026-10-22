@@ -18,7 +18,7 @@ export default function DocumentUpload({ studentId }) {
     }
   }
   return <section className="live-card"><h2>Upload student document</h2><p>PDF, JPEG and PNG scans are checked by the server. An accepted upload replaces the current document of the same type while retaining its earlier version.</p>
-    <form onSubmit={submit}><label>Document type<select value={type} disabled={state.busy} onChange={event => { setType(event.target.value); setConfirmed(false); }}><option value="result">Result</option><option value="biodata">Biodata</option><option value="birth_cecrtificate">Birth certificate</option><option value="other">Other</option></select></label>
+    <form className="live-form" onSubmit={submit}><label>Document type<select value={type} disabled={state.busy} onChange={event => { setType(event.target.value); setConfirmed(false); }}><option value="result">Result</option><option value="biodata">Biodata</option><option value="birth_cecrtificate">Birth certificate</option><option value="other">Other</option></select></label>
       <label>Scanned document<input type="file" accept=".pdf,.jpg,.jpeg,.png" disabled={state.busy} onChange={event => { setFile(event.target.files?.[0] || null); setConfirmed(false); }} /></label>
       <label><span><input type="checkbox" checked={confirmed} disabled={state.busy} onChange={event => setConfirmed(event.target.checked)} /> I have checked the student, document type and replacement.</span></label><button disabled={state.busy || !confirmed || !file}>{state.busy ? 'Uploading…' : 'Upload document'}</button></form>
     {state.error && <p role="alert">{state.error}</p>}

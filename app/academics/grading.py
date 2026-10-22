@@ -13,6 +13,7 @@ INITIAL_BANDS = [
 ]
 
 
+# Parse and validate a complete, non-overlapping 0–100 score-to-point scale.
 def validate_bands(bands):
     if not isinstance(bands, list) or not bands:
         raise ValidationError({"bands": "Provide the complete list of grading bands."})
@@ -45,6 +46,7 @@ def validate_bands(bands):
     return parsed
 
 
+# Reject non-Decimal, non-finite, or out-of-range scores.
 def validate_score(score):
     if not isinstance(score, Decimal) or not score.is_finite():
         raise ValidationError({"score": "Provide a finite Decimal score."})
@@ -52,6 +54,7 @@ def validate_score(score):
         raise ValidationError({"score": "Score must be between 0 and 100."})
 
 
+# Return the grade point for a score using its published scale or the initial default.
 def grade_point_for_score(score, *, grading_scale=None):
     validate_score(score)
     if grading_scale is not None and not grading_scale.is_published:
