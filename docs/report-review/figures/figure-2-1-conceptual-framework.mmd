@@ -1,0 +1,12 @@
+flowchart TB
+    U[Authenticated departmental user] --> A[Web application and permissions]
+    A --> R[(Structured student and academic records)]
+    A --> M[Document metadata and history]
+    M --> D[(Private supporting documents)]
+    F[Presented fingerprint] --> C[Capture and preservation]
+    C --> B[Compatible biometric comparison]
+    B --> I[Reviewed identity binding to student UUID]
+    I --> W[Workflow eligibility and timing checks]
+    A --> W
+    W --> E[Permitted record or attendance operation]
+    E --> R

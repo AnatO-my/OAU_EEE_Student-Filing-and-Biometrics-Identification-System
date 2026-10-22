@@ -9,6 +9,7 @@ from .access import require_result_access
 
 
 @transaction.atomic
+# Create an unverified result using the offering's published grading scale and credit units.
 def create_result(
     *,
     user,
@@ -46,6 +47,7 @@ def create_result(
 
 
 @transaction.atomic
+# Update a result score and clear verification when the saved score actually changes.
 def update_result_score(*, user, result, score):
     student = Student.objects.select_for_update().get(pk=result.student_id)
     require_result_access(user, student, "change_result")
@@ -69,6 +71,7 @@ def update_result_score(*, user, result, score):
 
 
 @transaction.atomic
+# Verify only when the reviewed score still matches the saved, valid result score.
 def verify_result(*, user, result, expected_score):
     student = Student.objects.select_for_update().get(pk=result.student_id)
     require_result_access(user, student, "verify_result")
@@ -92,12 +95,14 @@ def verify_result(*, user, result, expected_score):
     return result
 
 
+# Require an active staff superuser for HOD-only academic administration.
 def require_hod(user):
     if not (user.is_authenticated and user.is_active and user.is_staff and user.is_superuser):
         raise PermissionDenied("Only the active HOD may manage grading versions.")
 
 
 @transaction.atomic
+# Create a validated grading-scale draft that is not yet available for results.
 def create_grading_scale(*, user, validated_data):
     require_hod(user)
     scale = GradingScale(**validated_data, is_published=False)
@@ -106,6 +111,7 @@ def create_grading_scale(*, user, validated_data):
 
 
 @transaction.atomic
+# Change a draft scale while refusing edits to versions already published.
 def update_grading_scale(*, user, scale, validated_data):
     require_hod(user)
     scale = GradingScale.objects.select_for_update().get(pk=scale.pk)
@@ -119,6 +125,7 @@ def update_grading_scale(*, user, scale, validated_data):
 
 
 @transaction.atomic
+# Publish a grading version so offerings can use it for new results.
 def publish_grading_scale(*, user, scale):
     require_hod(user)
     scale = GradingScale.objects.select_for_update().get(pk=scale.pk)
@@ -128,6 +135,7 @@ def publish_grading_scale(*, user, scale):
 
 
 @transaction.atomic
+# Assign a published scale only while an offering has no recorded results.
 def assign_offering_scale(*, user, offering, scale):
     require_hod(user)
     offering = CourseOffering.objects.select_for_update().get(pk=offering.pk)

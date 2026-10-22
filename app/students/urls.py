@@ -6,11 +6,15 @@ from .views import (
     MyStudentProfileView,
     BulkStudentLevelView,
     BulkStudentStatusView,
+    StudentIdentifierLookupView,
+    StudentIdentifierPromotionView,
 )
 
 from .export_views import StudentExportView
 
 urlpatterns = [
+    path("students/lookup/", StudentIdentifierLookupView.as_view(), name="student-identifier-lookup"),
+    path("students/<uuid:student_id>/promote-identifier/", StudentIdentifierPromotionView.as_view(), name="student-identifier-promotion"),
     path("students/export/", StudentExportView.as_view(), name="student-export"),
     path(
         "students/bulk-level-change/",
@@ -44,3 +48,7 @@ urlpatterns += [
 
 from accounts.lifecycle_views import StudentAccountView
 urlpatterns += [path("students/<uuid:student_id>/account/", StudentAccountView.as_view(), name="student-account")]
+
+from accounts.student_setup_views import StudentAccessEmailView, StudentSetupIssueView
+urlpatterns += [path("students/<uuid:student_id>/account/setup-link/", StudentSetupIssueView.as_view(), name="student-setup-link")]
+urlpatterns += [path("students/<uuid:student_id>/account/email-link/", StudentAccessEmailView.as_view(), name="student-access-email")]

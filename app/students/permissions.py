@@ -1,6 +1,7 @@
 from rest_framework.permissions import DjangoModelPermissions
 
 
+# Require Django model permissions for reads as well as write operations.
 class StudentModelPermissions(DjangoModelPermissions):
     perms_map = {
         **DjangoModelPermissions.perms_map,

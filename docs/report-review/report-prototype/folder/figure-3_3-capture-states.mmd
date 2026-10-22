@@ -1,0 +1,14 @@
+stateDiagram-v2
+    [*] --> Stopped
+    Stopped --> Active: Arm valid batch
+    state "Armed capture" as Active {
+        [*] --> WaitingForLift
+        WaitingForLift --> WaitingForFinger: Finger lifted
+        WaitingForFinger --> Capturing: Finger placed
+        Capturing --> Saving: Usable probe
+        Capturing --> WaitingForLift: Capture rejected
+        Saving --> WaitingForLift: Commit verified
+    }
+    Active --> Stopped: Stop or diagnostic
+    Saving --> RecoveryReview: Storage uncertain
+    RecoveryReview --> Stopped: Preserve for review

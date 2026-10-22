@@ -91,3 +91,6 @@ urlpatterns += [
 ]
 
 urlpatterns += [path("result-shares/", ResultShareListView.as_view(), name="result-share-list")]
+
+from .current_session_views import CurrentSessionView
+urlpatterns += [path("academic-sessions/current/", CurrentSessionView.as_view(), name="current-academic-session")]

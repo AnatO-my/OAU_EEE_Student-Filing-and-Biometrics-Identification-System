@@ -10,11 +10,17 @@ from .sharing_transport import (RejectedSubmission, UncertainSubmission,
     validate_transport, submit_email, submit_whatsapp)
 
 
-def process_next():
+# Claim and process one queued delivery, persisting uncertain outcomes to prevent retries.
+def process_next(*, channel=None):
     # Persist a claim before network I/O. Never automatically reclaim processing
     # rows after a worker crash: the provider may already have accepted them.
     with transaction.atomic():
-        candidate = ResultShareDelivery.objects.filter(status="queued").order_by("pk").first()
+        candidates = ResultShareDelivery.objects.filter(status="queued")
+        if channel is not None:
+            if channel not in ("email", "whatsapp"):
+                raise ValueError("Unknown result-sharing channel.")
+            candidates = candidates.filter(channel=channel)
+        candidate = candidates.order_by("pk").first()
         if candidate is None:
             return None
         claimed = ResultShareDelivery.objects.filter(pk=candidate.pk, status="queued").update(

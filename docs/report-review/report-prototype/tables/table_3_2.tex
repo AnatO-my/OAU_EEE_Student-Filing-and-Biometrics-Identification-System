@@ -1,0 +1,32 @@
+% !TeX root = ../main.tex
+\begingroup
+\singlespacing%
+\setlength{\tabcolsep}{4pt}
+\begin{longtable}{@{}>{\RaggedRight\arraybackslash}p{\dimexpr0.220\linewidth-2\tabcolsep\relax}>{\RaggedRight\arraybackslash}p{\dimexpr0.390\linewidth-2\tabcolsep\relax}>{\RaggedRight\arraybackslash}p{\dimexpr0.390\linewidth-2\tabcolsep\relax}@{}}
+\caption{Selected implemented records and integrity rules}\label{tab:3-2}\\
+\toprule
+\textbf{Entity} & \textbf{Principal information} & \textbf{Important relationship or rule} \\
+\midrule
+\endfirsthead%
+\toprule
+\textbf{Entity} & \textbf{Principal information} & \textbf{Important relationship or rule} \\
+\midrule
+\endhead%
+\midrule
+\multicolumn{3}{r}{Continued on next page}\\
+\endfoot%
+\bottomrule
+\endlastfoot%
+Student & Permanent UUID, external identifier, name, admission and current academic information & External identifier is unique; account linkage is optional and one-to-one. \\ \addlinespace
+Guardian & Name, relationship and contact information & Linked to a student; several guardian records may belong to the same student. \\ \addlinespace
+Academic\allowbreak~Session & Academic-year label & Unique session with a validated consecutive-year format. \\ \addlinespace
+Course & Course code and title & Course code is unique. \\ \addlinespace
+Course\allowbreak~Offering & Course, session, semester, level, units and grading scale & Course/session/semester combination is unique. \\ \addlinespace
+Result & Student, offering, attempt, score, saved units, grading scale and verification state & Student/offering/attempt combination is unique; a missing score remains distinct from zero. \\ \addlinespace
+Grading\allowbreak~Scale & Version name, grade-point bands and publication state & Published grading versions are protected from alteration. \\ \addlinespace
+Adviser\allowbreak~Assignment & Staff, academic session, level and active state & Controls the relevant adviser scope. \\ \addlinespace
+Course\allowbreak~Roster and approval & Confirmed course membership and revision history & Class sessions preserve the approved membership used when they are opened. \\ \addlinespace
+Attendance\allowbreak~Record & Class session, student, status and responsible actor & At most one record for a student in a class session. \\ \addlinespace
+Pending\allowbreak~Capture\allowbreak~Batch and event & Class-bound metadata, immutable probe event, boot identity and uptime & Pending evidence is separate from an attendance record. \\ \addlinespace
+\end{longtable}
+\endgroup

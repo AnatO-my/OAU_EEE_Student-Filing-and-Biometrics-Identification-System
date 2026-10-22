@@ -3,6 +3,7 @@
 from django.db import migrations, models
 
 
+# Seed the grading-scale table with the original five-point grading bands.
 def seed_initial_scale(apps, schema_editor):
     Scale = apps.get_model("academics", "GradingScale")
     Scale.objects.using(schema_editor.connection.alias).create(

@@ -1,0 +1,31 @@
+% !TeX root = ../main.tex
+\begingroup
+\singlespacing%
+\setlength{\tabcolsep}{4pt}
+\begin{longtable}{@{}>{\RaggedRight\arraybackslash}p{\dimexpr0.220\linewidth-2\tabcolsep\relax}>{\RaggedRight\arraybackslash}p{\dimexpr0.390\linewidth-2\tabcolsep\relax}>{\RaggedRight\arraybackslash}p{\dimexpr0.390\linewidth-2\tabcolsep\relax}@{}}
+\caption{Regular ESP32 interface configuration}\label{tab:3-6}\\
+\toprule
+\textbf{Interface or function} & \textbf{Configuration} & \textbf{Evidence status} \\
+\midrule
+\endfirsthead%
+\toprule
+\textbf{Interface or function} & \textbf{Configuration} & \textbf{Evidence status} \\
+\midrule
+\endhead%
+\midrule
+\multicolumn{3}{r}{Continued on next page}\\
+\endfoot%
+\bottomrule
+\endlastfoot%
+Scanner TX to ESP32 RX & GPIO16 & Working UART connection recorded in hardware tests. \\ \addlinespace
+Scanner RX from ESP32 TX & GPIO17 & Working UART connection recorded in hardware tests. \\ \addlinespace
+Scanner UART & 57,600 baud, 8N1 & Recorded scanner communication configuration. \\ \addlinespace
+PC console/recorder & 115,200 baud & Firmware and recorder configuration. \\ \addlinespace
+I2C SDA/SCL & GPIO21/GPIO22, 100 kHz & Configured bus used by the clock path; final assembly schematic must show actual connections. \\ \addlinespace
+DS1307 address & 0\(\text{x}\)68 & Clock adapter configuration and pilot timekeeping. \\ \addlinespace
+Optional SSD1306 display & \(128\times64\), configured address 0\(\text{x}\)3C & Optional adapter; inclusion in the final build needs its own evidence. \\ \addlinespace
+Enrol/\allowbreak~delete/\allowbreak~menu buttons & GPIO25/\allowbreak~GPIO26/\allowbreak~GPIO27 & Regular-board UI configuration, separate from the accuracy and deferred-capture profiles. \\ \addlinespace
+Green/red LED outputs & GPIO18/GPIO19 & Configured feedback outputs; actual parts and resistor values require final schematic evidence. \\ \addlinespace
+Buzzer control & GPIO23 & Configured output; the proposed driver stage is not established as a measured assembled circuit. \\ \addlinespace
+\end{longtable}
+\endgroup

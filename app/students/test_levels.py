@@ -6,8 +6,10 @@ from accounts.models import User, AdviserAssignment
 from .models import Student
 
 
+# Verify that level and graduation changes remain HOD-controlled and atomic.
 @override_settings(CURRENT_ACADEMIC_SESSION="2026/2027")
 class HODLevelTests(TestCase):
+    # Prepare an HOD, adviser assignments, sample students, and bulk payload.
     def setUp(self):
         self.client = APIClient()
         self.hod = User.objects.create_superuser(
@@ -42,6 +44,7 @@ class HODLevelTests(TestCase):
             "current_level": 400,
         }
 
+    # Prevent advisers from moving students even when assigned to both levels.
     def test_adviser_cannot_change_level_even_with_both_assignments(self):
         self.client.force_authenticate(self.staff)
         response = self.client.patch(
@@ -54,6 +57,7 @@ class HODLevelTests(TestCase):
         self.assertEqual(self.students[0].current_level, 300)
         self.assertEqual(self.students[0].full_name, "Student 0")
 
+    # Allow the HOD to change a single student's level.
     def test_hod_can_change_one_student(self):
         self.client.force_authenticate(self.hod)
         response = self.client.patch(
@@ -65,6 +69,7 @@ class HODLevelTests(TestCase):
         self.students[0].refresh_from_db()
         self.assertEqual(self.students[0].current_level, 400)
 
+    # Apply a bulk level change only to the identifiers submitted.
     def test_bulk_change_updates_only_selected_students(self):
         self.client.force_authenticate(self.hod)
         payload = {**self.payload, "student_ids": [str(self.students[0].pk)]}
@@ -77,6 +82,7 @@ class HODLevelTests(TestCase):
             student.refresh_from_db()
             self.assertEqual(student.current_level, level)
 
+    # Reject invalid bulk selections without saving a partial level update.
     def test_bulk_failure_saves_no_partial_changes(self):
         self.client.force_authenticate(self.hod)
         for changes in [
@@ -94,6 +100,7 @@ class HODLevelTests(TestCase):
             self.assertEqual(response.status_code, 400)
             self.assertEqual(Student.objects.filter(current_level=300).count(), 2)
 
+    # Deny bulk level changes to anonymous, adviser, and student users.
     def test_bulk_is_hod_only(self):
         for user in [None, self.staff, User.objects.create_user("level-student")]:
             self.client.force_authenticate(user)
@@ -105,6 +112,7 @@ class HODLevelTests(TestCase):
             )
         self.assertEqual(Student.objects.filter(current_level=300).count(), 2)
 
+    # Require a valid CSRF token when the HOD uses session authentication.
     def test_bulk_session_requires_csrf(self):
         self.client = APIClient(enforce_csrf_checks=True)
         self.client.force_login(self.hod)
@@ -124,6 +132,7 @@ class HODLevelTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.data["updated_count"], 2)
 
+    # Prevent an adviser from changing a student's academic status.
     def test_adviser_cannot_mark_student_as_graduated(self):
         self.client.force_authenticate(self.staff)
 
@@ -145,6 +154,7 @@ class HODLevelTests(TestCase):
         )
         self.assertEqual(self.students[0].full_name, "Student 0")
 
+    # Require a verified CGPA before the HOD can graduate an individual.
     def test_hod_cannot_graduate_student_without_verified_cgpa(self):
         self.client.force_authenticate(self.hod)
 
@@ -164,6 +174,7 @@ class HODLevelTests(TestCase):
         )
         self.assertEqual(self.students[0].current_level, 300)
 
+    # Keep every selected student unchanged if bulk graduation is ineligible.
     def test_bulk_graduation_without_verified_cgpa_changes_nothing(self):
         self.client.force_authenticate(self.hod)
 

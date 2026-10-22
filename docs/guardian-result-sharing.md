@@ -134,9 +134,17 @@ while sending every message. A worker submits queued messages:
 .\.venv\Scripts\python.exe manage.py process_result_shares --limit 100
 ```
 
-Run it regularly under a supervised deployment worker/scheduler using the same
-PostgreSQL database and provider configuration as the API. The command exits after
-at most the specified count; it is not a permanently running daemon. No scheduler
+Without --watch, the command exits after at most the specified count. For a
+supervised email-only process, use:
+
+```powershell
+.\.venv\Scripts\python.exe manage.py process_result_shares --channel email --watch --interval 5 --limit 25
+```
+
+Watch mode polls bounded processing passes and finishes the current submission
+when stopped. The limit applies per pass, not per day. Omit --channel only when
+both email and WhatsApp should be processed. Use the same PostgreSQL database and
+provider configuration as the API. Deployment templates are in deploy/; no scheduler
 or production service has been installed in this workspace. Use PostgreSQL for
 production queue workers; the SQLite test suite does not validate real concurrent
 worker/database-lock behavior. Worker submission timeout is 20 seconds per provider
@@ -177,10 +185,15 @@ missing contacts/preferences, duplicate contacts, stale previews, withdrawal,
 queue idempotency, known failures/retry limits, uncertain outcomes, multipart
 reports, template payload and provider error classification.
 
-React controls, production scheduling, approved WhatsApp template/token, SMTP,
-real PostgreSQL concurrency tests, provider sandbox acceptance, consent/contact
-review and live delivery validation remain deployment/integration tasks.
+The separate React page at frontend/guardian-results now integrates HOD login,
+student selection, guardian sharing permission, preview/review/send, batch history,
+status polling and known-failure retries. It creates email-only batches; historic
+mixed-channel batches are view-only. See its README for local startup and later
+integration into the finished frontend. The disposable demo links to this page.
 
-Final local validation: all 236 backend tests passed on isolated SQLite, Django
-system checks passed and no migration drift was detected. Provider calls were
-mocked/in-memory; PostgreSQL and live provider acceptance remain untested here.
+The user confirmed receipt of the live synthetic Gmail mock email during SMTP
+setup. The subsequent browser/worker integration used only a private synthetic
+SQLite database and in-memory email. Production supervision, real PostgreSQL
+concurrency tests, approved WhatsApp template/token, Meta acceptance, institutional
+contact/permission review and production delivery monitoring remain pending.
+See guardian-result-sharing-validation.md for the current validation record.

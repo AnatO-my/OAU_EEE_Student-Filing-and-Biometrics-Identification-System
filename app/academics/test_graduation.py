@@ -9,9 +9,11 @@ from .models import Course, CourseOffering, CourseRequirement, GraduationReview,
 from .services import create_result, update_result_score, verify_result
 
 
+# Exercise the HOD-reviewed graduation process and its history and policy safeguards.
 class GraduationWorkflowTests(APITestCase):
     setUp = fixtures.ResultCreateAPITests.setUp
 
+    # Record and verify a result, then satisfy the student's course requirement.
     def prepare(self, student=None, score="40"):
         student = student or self.student
         result = create_result(user=self.hod, student=student, offering=self.offering, score=Decimal(score))
@@ -19,9 +21,11 @@ class GraduationWorkflowTests(APITestCase):
         CourseRequirement.objects.create(student=student, offering=self.offering, recorded_by=self.hod)
         return result
 
+    # Build the route for the selected student's graduation-history review.
     def review_url(self, student=None):
         return reverse("graduation-review", kwargs={"student_id": (student or self.student).pk})
 
+    # Fetch the reviewed-history digest when omitted and submit HOD approval.
     def approve(self, student=None, digest=None):
         self.client.force_authenticate(self.hod)
         if digest is None:
@@ -31,11 +35,13 @@ class GraduationWorkflowTests(APITestCase):
         return self.client.post(self.review_url(student), {"notes": "Required history and other requirements reviewed.",
             "expected_digest": digest, "history_complete": True, "other_requirements_satisfied": True}, format="json")
 
+    # Request a graduation-status change for the selected student as the HOD.
     def graduate(self, student=None):
         self.client.force_authenticate(self.hod)
         return self.client.patch(reverse("student-detail", kwargs={"student_id": (student or self.student).pk}),
             {"academic_status": "graduated"}, format="json")
 
+    # Require review before graduation and preserve the student's existing profile state.
     def test_exactly_one_qualifies_after_hod_review(self):
         self.prepare()
         self.assertEqual(self.graduate().status_code, 400)
@@ -46,6 +52,7 @@ class GraduationWorkflowTests(APITestCase):
         self.assertEqual(self.student.current_level, 300)
         self.assertTrue(self.student.is_active)
 
+    # Keep a CGPA just below the threshold ineligible rather than rounding it upward.
     def test_point_995_never_rounds_into_eligibility(self):
         Result.objects.create(student=self.student, offering=self.offering, score=Decimal("40"),
             credit_units=199, is_verified=True)
@@ -56,6 +63,7 @@ class GraduationWorkflowTests(APITestCase):
         self.assertEqual(self.client.get(self.review_url()).status_code, 400)
         self.assertEqual(self.graduate().status_code, 400)
 
+    # Require a recorded result or reviewed exemption for every required offering.
     def test_missing_requirement_result_blocks_review(self):
         self.prepare()
         course = Course.objects.create(code="EEE302", title="Another required course")
@@ -69,12 +77,14 @@ class GraduationWorkflowTests(APITestCase):
         self.assertEqual(self.client.patch(detail, {"resolution": "exemption", "reason": "HOD-reviewed exemption reference EX-1"}, format="json").status_code, 200)
         self.assertEqual(self.approve().status_code, 200)
 
+    # Refuse approval when no course-requirement manifest has been recorded.
     def test_no_requirement_manifest_blocks_review(self):
         result = self.prepare()
         self.student.course_requirements.all().delete()
         self.client.force_authenticate(self.hod)
         self.assertEqual(self.client.get(self.review_url()).status_code, 400)
 
+    # Reject stale review digests after result edits and require a fresh approval.
     def test_changed_history_rejects_stale_preview_and_approval(self):
         result = self.prepare()
         self.client.force_authenticate(self.hod)
@@ -90,6 +100,7 @@ class GraduationWorkflowTests(APITestCase):
         self.assertEqual(self.approve().status_code, 200)
         self.assertEqual(self.graduate().status_code, 200)
 
+    # Require affirmative HOD confirmation of other graduation requirements.
     def test_hod_must_confirm_other_requirements(self):
         self.prepare()
         self.client.force_authenticate(self.hod)
@@ -99,12 +110,14 @@ class GraduationWorkflowTests(APITestCase):
         self.assertEqual(response.status_code, 400)
         self.assertFalse(GraduationReview.objects.exists())
 
+    # Limit graduation-review read and approval endpoints to the active HOD.
     def test_graduation_review_is_hod_only(self):
         self.prepare()
         self.client.force_authenticate(self.staff)
         self.assertEqual(self.client.get(self.review_url()).status_code, 403)
         self.assertEqual(self.client.post(self.review_url(), {}, format="json").status_code, 403)
 
+    # Apply a bulk status change atomically when any student's review is incomplete.
     def test_bulk_graduation_is_all_or_nothing(self):
         self.prepare()
         self.assertEqual(self.approve().status_code, 200)
@@ -121,6 +134,7 @@ class GraduationWorkflowTests(APITestCase):
         self.assertEqual(self.client.post(url, payload, format="json").status_code, 200)
         self.assertEqual(Student.objects.filter(academic_status="graduated").count(), 2)
 
+    # Block edits to graduated students' academic history until the HOD reopens status.
     def test_graduated_history_requires_explicit_hod_reopening(self):
         result = self.prepare()
         self.approve()
@@ -131,6 +145,7 @@ class GraduationWorkflowTests(APITestCase):
         self.assertEqual(self.client.patch(student_url, {"academic_status": "undergraduate"}, format="json").status_code, 200)
         self.assertEqual(self.client.patch(detail, {"score": "50"}, format="json").status_code, 200)
 
+    # Prevent simultaneous profile and graduation changes from bypassing review.
     def test_profile_change_cannot_bypass_review_during_graduation(self):
         self.prepare()
         self.approve()
@@ -141,6 +156,7 @@ class GraduationWorkflowTests(APITestCase):
         self.assertEqual(self.student.current_level, 300)
         self.assertEqual(self.student.academic_status, "undergraduate")
 
+    # Ensure administrative paths cannot bypass graduation review or account-linking rules.
     def test_admin_cannot_bypass_graduation_or_account_linking(self):
         self.client.force_login(self.hod)
         response = self.client.post(f"/admin/students/student/{self.student.pk}/change/", {
@@ -157,6 +173,7 @@ class GraduationWorkflowTests(APITestCase):
         self.assertEqual(self.student.academic_status, "undergraduate")
         self.assertIsNone(self.student.user_id)
 
+    # Report whether the saved graduation review still matches the current history.
     def test_cgpa_reports_current_review(self):
         self.prepare()
         self.approve()

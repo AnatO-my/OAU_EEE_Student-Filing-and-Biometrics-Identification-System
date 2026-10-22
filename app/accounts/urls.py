@@ -15,3 +15,6 @@ urlpatterns += [
     path("password/reset/", PasswordResetRequestView.as_view(), name="password-reset"),
     path("password/reset/confirm/", PasswordResetConfirmView.as_view(), name="password-reset-confirm"),
 ]
+
+from .student_setup_views import StudentSetupConfirmView
+urlpatterns += [path("student/setup/confirm/", StudentSetupConfirmView.as_view(), name="student-setup-confirm")]

@@ -1,0 +1,8 @@
+erDiagram
+    STUDENT ||--o{ GUARDIAN : has
+    STUDENT ||--o{ RESULT : receives
+    COURSE ||--o{ COURSE_OFFERING : has
+    ACADEMIC_SESSION ||--o{ COURSE_OFFERING : contains
+    COURSE_OFFERING ||--o{ RESULT : assesses
+    GRADING_SCALE ||--o{ COURSE_OFFERING : configures
+    GRADING_SCALE ||--o{ RESULT : interprets

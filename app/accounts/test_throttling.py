@@ -9,6 +9,7 @@ from .models import User
 from .throttling import LOGIN_FAILURE_LIMIT, login_failure_key
 
 
+# Verify failed sign-in limits, recovery after success, and username-scoped lockouts.
 class LoginThrottlingTests(TestCase):
     #the counter lives in a process wide cache, so every test starts from zero
     #and cannot be poisoned by failures recorded by an earlier test
@@ -37,6 +38,7 @@ class LoginThrottlingTests(TestCase):
             HTTP_X_CSRFTOKEN=token,
         )
 
+    # Repeated bad credentials trigger 429 and a bounded Retry-After value.
     def test_repeated_failures_are_paused_with_429_and_retry_after(self):
         for _ in range(LOGIN_FAILURE_LIMIT):
             response = self._attempt("example-staff-throttle", "wrong-password")
@@ -48,6 +50,7 @@ class LoginThrottlingTests(TestCase):
         self.assertGreater(int(blocked["Retry-After"]), 0)
         self.assertLessEqual(int(blocked["Retry-After"]), 60 * 15)
 
+    # Successful authentication clears prior failures so a fresh window begins.
     def test_successful_sign_in_clears_the_count(self):
         for _ in range(LOGIN_FAILURE_LIMIT - 1):
             response = self._attempt("example-staff-throttle", "wrong-password")
@@ -62,6 +65,7 @@ class LoginThrottlingTests(TestCase):
             response = self._attempt("example-staff-throttle", "wrong-password")
             self.assertEqual(response.status_code, 400)
 
+    # A username's failures do not lock out a different account at the same address.
     def test_lockout_is_scoped_to_the_submitted_username(self):
         for _ in range(LOGIN_FAILURE_LIMIT):
             self._attempt("example-staff-throttle", "wrong-password")
@@ -73,6 +77,7 @@ class LoginThrottlingTests(TestCase):
         unaffected = self._attempt("example-staff-other-throttle", "synthetic-test-password")
         self.assertEqual(unaffected.status_code, 200)
 
+    # Failed attempts for an unknown username consume the same rate limit.
     def test_unknown_username_counts_toward_the_same_limit(self):
         for _ in range(LOGIN_FAILURE_LIMIT):
             response = self._attempt("example-ghost-throttle", "whatever")
@@ -81,6 +86,7 @@ class LoginThrottlingTests(TestCase):
         blocked = self._attempt("example-ghost-throttle", "anything-else")
         self.assertEqual(blocked.status_code, 429)
 
+    # Blocked responses do not reveal whether the submitted password is correct.
     def test_blocked_answer_is_identical_for_wrong_and_right_passwords(self):
         for _ in range(LOGIN_FAILURE_LIMIT):
             self._attempt("example-staff-throttle", "wrong-password")
@@ -91,6 +97,7 @@ class LoginThrottlingTests(TestCase):
         self.assertEqual(right.status_code, 429)
         self.assertEqual(wrong.data, right.data)
 
+    # Once the stored window has expired, a correct sign-in is allowed again.
     def test_an_expired_window_allows_attempts_again(self):
         for _ in range(LOGIN_FAILURE_LIMIT):
             self._attempt("example-staff-throttle", "wrong-password")

@@ -15,6 +15,7 @@ from .models import User, AdviserAssignment
 from students.models import Student
 
 
+# Exercise password changes, reset links, account provisioning, and identity reporting.
 @override_settings(EMAIL_BACKEND="django.core.mail.backends.locmem.EmailBackend",
                    PASSWORD_RESET_FRONTEND_URL="https://frontend.example.test/reset-password",
                    CURRENT_ACADEMIC_SESSION="2026/2027")
@@ -22,6 +23,7 @@ class AccountLifecycleTests(APITestCase):
     old_password = "Original!8302-Cedar"
     new_password = "Replacement!9104-Coral"
 
+    # Set up HOD, staff, and linked student accounts for lifecycle scenarios.
     def setUp(self):
         cache.clear()
         self.hod = User.objects.create_superuser("lifecycle-hod", "hod@example.test", self.old_password)
@@ -33,6 +35,7 @@ class AccountLifecycleTests(APITestCase):
         self.student.user = self.account
         self.student.save(update_fields=["user"])
 
+    # Request a reset link and extract its UID and token for confirmation tests.
     def reset_payload(self):
         response = self.client.post(reverse("password-reset"), {"email": self.account.email}, format="json")
         self.assertEqual(response.status_code, 200)
@@ -40,6 +43,7 @@ class AccountLifecycleTests(APITestCase):
         query = parse_qs(urlsplit(link).query)
         return {"uid": query["uid"][0], "token": query["token"][0], "new_password": self.new_password}
 
+    # Reject an incorrect current password and a replacement that fails strength validation.
     def test_current_password_is_required_and_password_strength_enforced(self):
         self.client.force_authenticate(self.account)
         url = reverse("password-change")
@@ -48,6 +52,7 @@ class AccountLifecycleTests(APITestCase):
         self.account.refresh_from_db()
         self.assertTrue(self.account.check_password(self.old_password))
 
+    # Keep the changing session alive while invalidating the account's other sessions.
     def test_password_change_preserves_current_session_and_revokes_other_session(self):
         first, second = APIClient(), APIClient()
         first.force_login(self.account)
@@ -60,6 +65,7 @@ class AccountLifecycleTests(APITestCase):
         self.account.refresh_from_db()
         self.assertTrue(self.account.check_password(self.new_password))
 
+    # Return an indistinguishable response for known and unknown reset email addresses.
     def test_reset_request_has_same_response_for_known_and_unknown_email(self):
         known = self.client.post(reverse("password-reset"), {"email": self.account.email}, format="json")
         unknown = self.client.post(reverse("password-reset"), {"email": "unknown@example.test"}, format="json")
@@ -68,6 +74,7 @@ class AccountLifecycleTests(APITestCase):
         self.assertEqual(len(mail.outbox), 1)
         self.assertNotIn("token", known.data)
 
+    # A reset token succeeds once and is invalidated by the password update.
     def test_reset_link_is_single_use(self):
         payload = self.reset_payload()
         url = reverse("password-reset-confirm")
@@ -76,6 +83,7 @@ class AccountLifecycleTests(APITestCase):
         self.account.refresh_from_db()
         self.assertTrue(self.account.check_password(self.new_password))
 
+    # Expired reset tokens cannot change the password.
     def test_reset_expiry_is_enforced(self):
         payload = self.reset_payload()
         with patch.object(default_token_generator, "_now", return_value=datetime.now() + timedelta(hours=2)):
@@ -83,6 +91,7 @@ class AccountLifecycleTests(APITestCase):
         self.account.refresh_from_db()
         self.assertTrue(self.account.check_password(self.old_password))
 
+    # Malformed reset identifiers and weak replacement passwords are rejected.
     def test_invalid_link_and_weak_password_fail(self):
         url = reverse("password-reset-confirm")
         self.assertEqual(self.client.post(url, {"uid": "%%%", "token": "bad", "new_password": self.new_password}, format="json").status_code, 400)
@@ -90,11 +99,13 @@ class AccountLifecycleTests(APITestCase):
         payload["new_password"] = "123"
         self.assertEqual(self.client.post(url, payload, format="json").status_code, 400)
 
+    # Misconfigured recovery fails uniformly without revealing whether an account exists.
     @override_settings(PASSWORD_RESET_FRONTEND_URL="")
     def test_unconfigured_recovery_fails_without_account_disclosure(self):
         for email in (self.account.email, "unknown@example.test"):
             self.assertEqual(self.client.post(reverse("password-reset"), {"email": email}, format="json").status_code, 503)
 
+    # Browser reset requests remain CSRF-protected, and work with the issued token.
     def test_reset_endpoints_require_csrf(self):
         client = APIClient(enforce_csrf_checks=True)
         self.assertEqual(client.post(reverse("password-reset"), {"email": self.account.email}, format="json").status_code, 403)
@@ -103,6 +114,7 @@ class AccountLifecycleTests(APITestCase):
         response = client.post(reverse("password-reset"), {"email": self.account.email}, format="json", HTTP_X_CSRFTOKEN=token)
         self.assertEqual(response.status_code, 200)
 
+    # HOD provisioning creates a linked least-privilege account and never returns its password.
     def test_hod_provisioning_never_grants_privileges_or_returns_password(self):
         other = Student.objects.create(identifier_type="matriculation", identifier_value="000124",
             full_name="New student", phone_number="08000000000", admission_year=2024,
@@ -121,6 +133,7 @@ class AccountLifecycleTests(APITestCase):
             "password": self.new_password}, format="json").status_code, 400)
         self.assertFalse(User.objects.filter(username="duplicate-student").exists())
 
+    # Linking rejects privileged or already-linked accounts but accepts an eligible account.
     def test_linking_rejects_staff_and_already_linked_accounts(self):
         other = Student.objects.create(identifier_type="matriculation", identifier_value="000124",
             full_name="New student", phone_number="08000000000", admission_year=2024,
@@ -134,12 +147,14 @@ class AccountLifecycleTests(APITestCase):
         other.refresh_from_db()
         self.assertEqual(other.user_id, unlinked.pk)
 
+    # Ordinary staff cannot create or link student accounts.
     def test_staff_cannot_provision_or_link_student_account(self):
         self.client.force_authenticate(self.staff)
         url = reverse("student-account", kwargs={"student_id": self.student.pk})
         self.assertEqual(self.client.post(url, {}, format="json").status_code, 403)
         self.assertEqual(self.client.put(url, {"account_id": self.account.pk}, format="json").status_code, 403)
 
+    # The current-user response includes effective permissions and active adviser levels.
     def test_current_user_reports_permissions_and_assignment_levels(self):
         permission = Permission.objects.get(content_type__app_label="students", codename="view_student")
         self.staff.user_permissions.add(permission)
@@ -152,6 +167,7 @@ class AccountLifecycleTests(APITestCase):
         self.assertIn("students.view_student", response.data["permissions"])
         self.assertEqual(response.data["adviser_levels"], [300])
 
+    # Apply the configured request limit to repeated password-reset attempts.
     @override_settings(REST_FRAMEWORK={
         "DEFAULT_AUTHENTICATION_CLASSES": ["rest_framework.authentication.SessionAuthentication"],
         "DEFAULT_THROTTLE_RATES": {"password_reset": "1/hour", "password_reset_confirm": "60/hour"},

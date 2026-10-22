@@ -1,0 +1,28 @@
+% !TeX root = ../main.tex
+\begingroup
+\singlespacing%
+\setlength{\tabcolsep}{4pt}
+\begin{longtable}{@{}>{\RaggedRight\arraybackslash}p{\dimexpr0.220\linewidth-2\tabcolsep\relax}>{\RaggedRight\arraybackslash}p{\dimexpr0.390\linewidth-2\tabcolsep\relax}>{\RaggedRight\arraybackslash}p{\dimexpr0.390\linewidth-2\tabcolsep\relax}@{}}
+\caption{Recognition pilot design}\label{tab:3-8}\\
+\toprule
+\textbf{Property} & \textbf{Whole-gallery experiment} & \textbf{Selected-slot experiment} \\
+\midrule
+\endfirsthead%
+\toprule
+\textbf{Property} & \textbf{Whole-gallery experiment} & \textbf{Selected-slot experiment} \\
+\midrule
+\endhead%
+\midrule
+\multicolumn{3}{r}{Continued on next page}\\
+\endfoot%
+\bottomrule
+\endlastfoot%
+Firmware profile & esp32-accuracy-identify & esp32-accuracy-verify \\ \addlinespace
+Scanner operation & Search over the reported reference range & Search restricted to the selected occupied slot \\ \addlinespace
+Operating mode & 1:N identification & Claimed-reference 1:1 check using selected-slot Search \\ \addlinespace
+Reference gallery & One enrolled template, slot 1 & Same enrolled template, slot 1 \\ \addlinespace
+Genuine attempts & Ten new presentations of the enrolled finger & Ten new presentations of the enrolled finger \\ \addlinespace
+Negative attempts & Ten presentations of the designated unenrolled finger & Ten presentations of the designated different finger \\ \addlinespace
+Trial separation & Detected lift and minimum two-second cooldown & Detected lift and minimum two-second cooldown \\ \addlinespace
+\end{longtable}
+\endgroup

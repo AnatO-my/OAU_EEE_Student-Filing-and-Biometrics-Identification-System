@@ -1,0 +1,13 @@
+# Portable: custom OT classes and styles are beside main.tex.
+$pdf_mode = 1;
+$max_repeat = 8;
+
+# Isolate Biber's extracted runtime on Windows; leave Unix/Overleaf unchanged.
+# A damaged default Biber cache caused startup assertions on this workstation.
+if ($^O eq 'MSWin32' && !exists $ENV{'PAR_GLOBAL_TEMP'}) {
+    require File::Spec;
+    require File::Path;
+    my $biber_cache = File::Spec->catdir(File::Spec->tmpdir(), 'ot-report-biber');
+    File::Path::make_path($biber_cache);
+    $ENV{'PAR_GLOBAL_TEMP'} = $biber_cache;
+}

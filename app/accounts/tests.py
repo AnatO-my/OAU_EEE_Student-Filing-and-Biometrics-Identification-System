@@ -7,7 +7,9 @@ from .models import AdviserAssignment, User, AdviserMessage
 from students.models import Student
 
 
+# Check that adviser assignments reject invalid sessions, levels, and account types.
 class AdviserAssignmentValidationTests(SimpleTestCase):
+    # Build an unsaved assignment with valid defaults for focused validation checks.
     def assignment(self, **changes):
         values = {
             "academic_session": "2026/2027",
@@ -16,27 +18,32 @@ class AdviserAssignmentValidationTests(SimpleTestCase):
         values.update(changes)
         return AdviserAssignment(**values)
 
+    # A consecutive academic session and positive level pass model validation.
     def test_valid_session_is_accepted(self):
         self.assignment().clean()
 
+    # Reject session labels that do not use the required year/year format.
     def test_invalid_session_format_is_rejected(self):
         with self.assertRaises(ValidationError) as error:
             self.assignment(academic_session="2026-2027").clean()
 
         self.assertIn("academic_session", error.exception.message_dict)
 
+    # Reject a session whose ending year does not immediately follow its start.
     def test_nonconsecutive_years_are_rejected(self):
         with self.assertRaises(ValidationError) as error:
             self.assignment(academic_session="2026/2028").clean()
 
         self.assertIn("academic_session", error.exception.message_dict)
 
+    # A zero-level assignment must fail validation.
     def test_zero_level_is_rejected(self):
         with self.assertRaises(ValidationError) as error:
             self.assignment(level=0).clean()
 
         self.assertIn("level", error.exception.message_dict)
 
+    # Assignments must point to staff accounts rather than student accounts.
     def test_nonstaff_account_is_rejected(self):
         user = User(pk=1, username="example-student", is_staff=False)
 
@@ -46,7 +53,9 @@ class AdviserAssignmentValidationTests(SimpleTestCase):
         self.assertIn("staff", error.exception.message_dict)
 
 
+# Confirm recipient links remain a snapshot when a student's level later changes.
 class AdviserMessageTests(TestCase):
+    # Moving a student does not remove their association with an existing message.
     def test_level_change_preserves_existing_message(self):
         adviser = User.objects.create_user(
             username="example-adviser",
@@ -81,6 +90,7 @@ class AdviserMessageTests(TestCase):
         self.assertTrue(student.adviser_messages.filter(pk=message.pk).exists())
 
 
+# Verify unsafe endpoints reject requests without CSRF while safe reads remain available.
 class CSRFEnforcementTests(TestCase):
     # class that proves the unsafe endpoints still reject requests that arrive without
     # the csrf token, django test client skips csrf checks by default so this is turned
@@ -101,16 +111,19 @@ class CSRFEnforcementTests(TestCase):
             )
         )
 
+    # Session logout requires a valid CSRF token.
     def test_logout_without_csrf_token_is_rejected(self):
         self.client.force_login(self.staff)
         response = self.client.post("/api/auth/logout/")
         self.assertEqual(response.status_code, 403)
 
+    # An authenticated safe GET does not need a CSRF token.
     def test_student_reads_without_csrf_token_still_succeed(self):
         self.client.force_login(self.staff)
         response = self.client.get("/api/students/")
         self.assertEqual(response.status_code, 200)
 
+    # Login is an unsafe request and rejects a missing CSRF token.
     def test_login_without_a_prior_csrf_token_is_rejected(self):
         response = self.client.post(
             "/api/auth/login/",
@@ -119,6 +132,7 @@ class CSRFEnforcementTests(TestCase):
         )
         self.assertEqual(response.status_code, 403)
 
+    # A client that first obtains a CSRF token can sign in successfully.
     def test_login_with_csrf_token_succeeds(self):
         token = self.client.get("/api/auth/csrf/").data["csrfToken"]
         response = self.client.post(
@@ -130,6 +144,7 @@ class CSRFEnforcementTests(TestCase):
         self.assertEqual(response.status_code, 200)
 
 
+# Exercise the staff-facing JSON authentication endpoints and session lifecycle.
 class AuthEndpointTests(TestCase):
     # class covering the JSON login, logout, current user, and csrf endpoints that the
     # React client needs before it can read any staff data
@@ -153,12 +168,14 @@ class AuthEndpointTests(TestCase):
             format="json",
         )
 
+    # The CSRF endpoint returns a token and sets its browser cookie.
     def test_csrf_endpoint_issues_a_token_and_cookie(self):
         response = self.client.get("/api/auth/csrf/")
         self.assertEqual(response.status_code, 200)
         self.assertTrue(response.data["csrfToken"])
         self.assertIn("csrftoken", response.cookies)
 
+    # Successful login returns identity data and creates a session cookie.
     def test_login_returns_identity_and_starts_a_session(self):
         response = self._login()
         self.assertEqual(response.status_code, 200)
@@ -167,6 +184,7 @@ class AuthEndpointTests(TestCase):
         self.assertNotIn("password", response.data)
         self.assertIn("sessionid", self.client.cookies)
 
+    # Incorrect passwords do not authenticate or create a session.
     def test_login_rejects_a_wrong_password(self):
         response = self.client.post(
             "/api/auth/login/",
@@ -176,6 +194,7 @@ class AuthEndpointTests(TestCase):
         self.assertEqual(response.status_code, 400)
         self.assertNotIn("sessionid", self.client.cookies)
 
+    # Unknown and nonstaff accounts receive the same rejection without a session.
     def test_login_rejects_nonstaff_and_unknown_accounts_identically(self):
         nonstaff = self.client.post(
             "/api/auth/login/",
@@ -191,12 +210,14 @@ class AuthEndpointTests(TestCase):
         self.assertEqual(nonstaff.data, unknown.data)
         self.assertNotIn("sessionid", self.client.cookies)
 
+    # Both username and password are required by the login serializer.
     def test_login_requires_both_credentials(self):
         response = self.client.post("/api/auth/login/", {}, format="json")
         self.assertEqual(response.status_code, 400)
         self.assertIn("username", response.data)
         self.assertIn("password", response.data)
 
+    # Anonymous callers are denied, while authenticated users can read their own identity.
     def test_current_user_requires_an_authenticated_session(self):
         # an anonymous caller is refused, but any authenticated account may read its own
         # identity now that students can sign in too
@@ -208,6 +229,7 @@ class AuthEndpointTests(TestCase):
         self.assertFalse(response.data["is_staff"])
         self.assertNotIn("password", response.data)
 
+    # The current-user endpoint reports the staff identity returned at login.
     def test_current_user_reports_the_signed_in_staff(self):
         self._login()
         response = self.client.get("/api/auth/me/")
@@ -215,12 +237,14 @@ class AuthEndpointTests(TestCase):
         self.assertEqual(response.data["username"], "example-staff")
         self.assertTrue(response.data["is_staff"])
 
+    # Logging out removes access to the authenticated identity endpoint.
     def test_logout_ends_the_session(self):
         self._login()
         self.assertEqual(self.client.post("/api/auth/logout/").status_code, 204)
         self.assertEqual(self.client.get("/api/auth/me/").status_code, 403)
 
 
+# Exercise student sign-in, own-profile access, and isolation from staff endpoints.
 class StudentLoginTests(TestCase):
     # class covering student sign in and the session it receives, it uses the real csrf
     # and session endpoints rather than forced authentication so the whole browser flow
@@ -263,26 +287,32 @@ class StudentLoginTests(TestCase):
         )
         return response, self.client.get("/api/auth/csrf/").data["csrfToken"]
 
+
+
     # method that signs an account in and returns only the response
     def _login(self, username):
         return self._sign_in(username)[0]
 
+    # A student account linked to a profile can establish a session.
     def test_student_with_a_profile_can_sign_in(self):
         response = self._login("example-student")
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.data["username"], "example-student")
         self.assertIn("sessionid", self.client.cookies)
 
+    # Staff sign-in continues to work alongside student sign-in.
     def test_staff_can_still_sign_in(self):
         response = self._login("example-staff-login")
         self.assertEqual(response.status_code, 200)
         self.assertTrue(response.data["is_staff"])
 
+    # Accounts with no staff role or student profile cannot sign in.
     def test_account_without_an_api_role_cannot_sign_in(self):
         response = self._login("example-unlinked")
         self.assertEqual(response.status_code, 400)
         self.assertNotIn("sessionid", self.client.cookies)
 
+    # Inactive student accounts are rejected without receiving a session.
     def test_inactive_account_cannot_sign_in(self):
         self.student_user.is_active = False
         self.student_user.save(update_fields=["is_active"])
@@ -290,6 +320,7 @@ class StudentLoginTests(TestCase):
         self.assertEqual(response.status_code, 400)
         self.assertNotIn("sessionid", self.client.cookies)
 
+    # Unlinked, unknown, and wrong-password attempts share the same public error.
     def test_every_rejection_returns_the_same_error(self):
         unlinked = self._login("example-unlinked")
         unknown = self.client.post(
@@ -307,6 +338,7 @@ class StudentLoginTests(TestCase):
         self.assertEqual(unlinked.data, unknown.data)
         self.assertEqual(unlinked.data, wrong.data)
 
+    # Student sessions expose only the authenticated student's identity.
     def test_student_session_reads_its_own_identity(self):
         self._login("example-student")
         response = self.client.get("/api/auth/me/")
@@ -315,16 +347,19 @@ class StudentLoginTests(TestCase):
         self.assertFalse(response.data["is_staff"])
         self.assertNotIn("password", response.data)
 
+    # A student session can read the profile linked to that account.
     def test_student_session_can_read_its_own_profile(self):
         self._login("example-student")
         response = self.client.get("/api/me/student/")
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.data["student_id"], str(self.student.student_id))
 
+    # Student sessions are denied access to staff-only student listings.
     def test_student_session_cannot_read_staff_endpoints(self):
         self._login("example-student")
         self.assertEqual(self.client.get("/api/students/").status_code, 403)
 
+    # A student can log out and then loses access to their identity and profile.
     def test_student_session_can_end_its_own_session(self):
         _, token = self._sign_in("example-student")
         response = self.client.post(
@@ -334,6 +369,7 @@ class StudentLoginTests(TestCase):
         self.assertEqual(self.client.get("/api/auth/me/").status_code, 403)
         self.assertEqual(self.client.get("/api/me/student/").status_code, 403)
 
+    # CSRF enforcement rejects student logout when the request omits its token.
     def test_student_logout_without_csrf_token_is_rejected(self):
         # csrf checks are off by default on the test client, so a separate enforcing
         # client is used to prove logout is still protected for a student session
@@ -356,8 +392,10 @@ from .models import User, AdviserMessage, AdviserAssignment
 from .services import send_adviser_message
 
 
+# Verify adviser-message authorization, recipient filtering, and API behavior.
 @override_settings(CURRENT_ACADEMIC_SESSION="2026/2027")
 class AdviserMessageSendingTests(TestCase):
+    # Create an adviser with the send permission, current assignment, and eligible student.
     def setUp(self):
         self.adviser = User.objects.create_user(
             username="sending-adviser",
@@ -384,6 +422,7 @@ class AdviserMessageSendingTests(TestCase):
             current_level=300,
         )
 
+    # A staff member without the explicit send permission cannot create messages.
     def test_sending_without_permission_is_rejected(self):
         self.adviser.user_permissions.clear()
 
@@ -404,6 +443,7 @@ class AdviserMessageSendingTests(TestCase):
 
         self.assertEqual(AdviserMessage.objects.count(), 0)
 
+    # Individual messages cannot target students outside the assigned level.
     def test_individual_message_outside_assigned_level_is_rejected(self):
         self.student.current_level = 400
         self.student.save(update_fields=["current_level"])
@@ -422,6 +462,7 @@ class AdviserMessageSendingTests(TestCase):
 
         self.assertEqual(AdviserMessage.objects.count(), 0)
 
+    # An adviser cannot use another staff member's assignment to send a message.
     def test_another_advisers_assignment_is_rejected(self):
         other_adviser = User.objects.create_user(
             username="other-adviser",
@@ -447,6 +488,7 @@ class AdviserMessageSendingTests(TestCase):
 
         self.assertEqual(AdviserMessage.objects.count(), 0)
 
+    # An individual message is saved with its assigned adviser and sole recipient.
     def test_send_individual_message(self):
         message = send_adviser_message(
             user=self.adviser,
@@ -465,7 +507,9 @@ class AdviserMessageSendingTests(TestCase):
         self.assertEqual(message.recipients.count(), 1)
         self.assertTrue(message.recipients.filter(pk=self.student.pk).exists())
 
+    # A level announcement includes active students only at the assigned level.
     def test_level_announcement_reaches_only_active_assigned_students(self):
+        # Create test profiles with selectable level and activity state.
         def create_student(identifier, level=300, is_active=True):
             return Student.objects.create(
                 identifier_type="matriculation",
@@ -497,6 +541,7 @@ class AdviserMessageSendingTests(TestCase):
             {self.student.pk, second.pk},
         )
 
+    # Revoked and stale-session assignments cannot be used for new messages.
     def test_revoked_and_previous_session_assignments_are_rejected(self):
         cases = [
             {"is_active": False, "academic_session": "2026/2027"},
@@ -522,6 +567,7 @@ class AdviserMessageSendingTests(TestCase):
 
                 self.assertEqual(AdviserMessage.objects.count(), 0)
 
+    # The API creates an individual message and reports the persisted recipient.
     def test_api_sends_individual_message(self):
         client = APIClient()
         client.force_authenticate(self.adviser)
@@ -552,6 +598,7 @@ class AdviserMessageSendingTests(TestCase):
             {self.student.pk},
         )
 
+    # Session-authenticated message creation requires a valid CSRF token.
     def test_session_sending_requires_csrf_token(self):
         client = APIClient(enforce_csrf_checks=True)
         client.force_login(self.adviser)

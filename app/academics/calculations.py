@@ -5,6 +5,7 @@ from django.core.exceptions import ValidationError
 from .grading import grade_point_for_score
 
 
+# Calculate a credit-weighted grade-point average, requiring every input result to be verified.
 def calculate_weighted_average(results):
     total_quality_points = Decimal("0")
     total_units = 0
@@ -31,12 +32,14 @@ def calculate_weighted_average(results):
     return total_quality_points / Decimal(total_units)
 
 
+# Calculate the student's cumulative average across all recorded attempts.
 def calculate_student_cgpa(*, student):
     results = student.results.select_related("grading_scale").order_by("pk")
 
     return calculate_weighted_average(results)
 
 
+# Calculate a semester average after validating the semester and selecting matching results.
 def calculate_student_gpa(
     *,
     student,

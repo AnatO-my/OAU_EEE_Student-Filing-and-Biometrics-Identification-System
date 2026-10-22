@@ -1,0 +1,14 @@
+flowchart TB
+    UI[Browser interface prototypes] -.-> API[Django API and scoped services]
+    API --> DB[(Structured records and pending evidence)]
+    API -.-> DM[Proposed document metadata and revision service]
+    DM -.-> FS[(Proposed private document storage)]
+    FP[Fingerprint sensor] --> ESP[ESP32 capture and storage]
+    ESP --> USB[USB export and validated JSONL file]
+    USB --> IMP[Authorised pending batch preview and import]
+    IMP --> DB
+    DB -.-> RES[Proposed compatible comparison and identity resolution]
+    RES -.-> REV[Proposed identity and timing review]
+    REV -.-> REC[Proposed biometric reconciliation]
+    REC -.-> ATT[Existing attendance and roster services]
+    ATT --> DB

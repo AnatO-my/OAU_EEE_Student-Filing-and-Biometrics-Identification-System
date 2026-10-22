@@ -1,0 +1,30 @@
+% !TeX root = ../main.tex
+\begingroup
+\singlespacing%
+\setlength{\tabcolsep}{4pt}
+\begin{longtable}{@{}>{\RaggedRight\arraybackslash}p{\dimexpr0.280\linewidth-2\tabcolsep\relax}>{\RaggedRight\arraybackslash}p{\dimexpr0.720\linewidth-2\tabcolsep\relax}@{}}
+\caption{Implemented interchange bounds and meanings}\label{tab:3-7}\\
+\toprule
+\textbf{Property} & \textbf{Implemented bound or rule} \\
+\midrule
+\endfirsthead%
+\toprule
+\textbf{Property} & \textbf{Implemented bound or rule} \\
+\midrule
+\endhead%
+\midrule
+\multicolumn{2}{r}{Continued on next page}\\
+\endfoot%
+\bottomrule
+\endlastfoot%
+Capture probe & Maximum 2,048 decoded bytes per event. \\ \addlinespace
+Batch & Maximum 512 capture events. \\ \addlinespace
+Backend import file & Maximum 2 MiB. \\ \addlinespace
+JSONL line & Maximum 4,096 bytes. \\ \addlinespace
+Append behaviour & New snapshots may append to the exact stored prefix; existing events retain content and order. \\ \addlinespace
+Exact retry & Recovers the durable receipt for the accepted file snapshot. \\ \addlinespace
+Conflict & Changed event content, reused event identity or inconsistent batch binding rejects the transaction. \\ \addlinespace
+Capture calendar time & Null until trusted timing provision and review are implemented. \\ \addlinespace
+Import effect & Pending evidence only; no automatic student identity, attendance, absence or warning. \\ \addlinespace
+\end{longtable}
+\endgroup

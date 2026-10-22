@@ -1,3 +1,4 @@
+from academics.session_context import current_session_name
 from django.conf import settings
 from django.core.exceptions import PermissionDenied
 from django.db import transaction
@@ -8,6 +9,8 @@ from students.models import Student
 from .models import AdviserAssignment
 from .models import AdviserMessage
 
+
+# Resolve and lock the caller's active, permitted assignment for the current session.
 def get_message_assignment(*, user, assignment_id):
     if (
         not user.is_authenticated
@@ -19,7 +22,7 @@ def get_message_assignment(*, user, assignment_id):
     if not user.has_perm("accounts.send_adviser_message"):
         raise PermissionDenied("You do not have permission to send messages.")
 
-    academic_session = settings.CURRENT_ACADEMIC_SESSION
+    academic_session = current_session_name()
     if not academic_session:
         raise PermissionDenied("The current academic session is not configured.")
 
@@ -38,6 +41,7 @@ def get_message_assignment(*, user, assignment_id):
     return assignment
 
 
+# Save an adviser message and snapshot its active recipients for the assigned level.
 @transaction.atomic
 def send_adviser_message(*, user, validated_data):
     assignment = get_message_assignment(
@@ -89,6 +93,8 @@ def send_adviser_message(*, user, validated_data):
 
     return message
 
+
+# Save an HOD message after resolving and locking the requested eligible recipients.
 @transaction.atomic
 def send_hod_message(*, user, validated_data):
     from django.contrib.auth import get_user_model
@@ -96,23 +102,37 @@ def send_hod_message(*, user, validated_data):
 
     if not user.is_authenticated or not user.is_active or not user.is_staff or not user.is_superuser:
         raise PermissionDenied("Only the active HOD superuser may send HOD messages.")
-    session = settings.CURRENT_ACADEMIC_SESSION
+    session = current_session_name()
     if not session:
         raise PermissionDenied("The current academic session is not configured.")
 
     audience = validated_data["audience"]
+    user_ids = {user.pk}
+    if audience == HODMessage.Audience.ADVISER:
+        target_id = validated_data.get("adviser_id")
+        if not isinstance(target_id, int) or target_id < 1:
+            raise ValidationError({"adviser_id": "Select an existing adviser account."})
+        user_ids.add(target_id)
+    # User rows precede student/assignment locks throughout this function. The
+    # sender lock also prevents a late FK key-share wait from reversing that
+    # order while an ownership transfer is waiting for another participant.
+    accounts = {account.pk: account for account in get_user_model().objects.select_for_update().filter(
+        pk__in=user_ids).order_by("pk")}
+    sender = accounts.get(user.pk)
+    if sender is None or not sender.is_active or not sender.is_staff or not sender.is_superuser:
+        raise PermissionDenied("Only the active HOD superuser may send HOD messages.")
+    user = sender
     students, advisers = [], []
     if audience == HODMessage.Audience.ADVISER:
         target = validated_data.get("adviser_id")
         if target is None or any(k in validated_data for k in ["recipient_id", "level"]):
             raise ValidationError({"adviser_id": "Provide only adviser_id for this audience."})
+        adviser = accounts.get(target)
         assignments = list(AdviserAssignment.objects.select_for_update().filter(
             staff_id=target, academic_session=session, is_active=True,
         ).order_by("pk"))
-        if assignments:
-            advisers = list(get_user_model().objects.select_for_update().filter(
-                pk=target, is_staff=True, is_active=True,
-            ))
+        if assignments and adviser is not None and adviser.is_staff and adviser.is_active:
+            advisers = [adviser]
     elif audience == HODMessage.Audience.INDIVIDUAL:
         target = validated_data.get("recipient_id")
         if target is None or any(k in validated_data for k in ["adviser_id", "level"]):

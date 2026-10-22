@@ -5,14 +5,25 @@ from django.contrib.auth.models import AbstractUser
 from django.conf import settings
 from django.db import models
 from django.core.exceptions import ValidationError
+from django.utils.translation import gettext_lazy as _
+
+from .validators import DepartmentUsernameValidator
 
 
+# Extend Django's user record for accounts used by staff and students.
 class User(AbstractUser):
     """Account for staff and students using Django authentication and permissions."""
 
-    pass
+    username_validator = DepartmentUsernameValidator()
+    username = models.CharField(
+        _("username"), max_length=150, unique=True,
+        help_text=_("Required. 150 characters or fewer. Letters, digits and @/./+/-/_ only."),
+        validators=[username_validator],
+        error_messages={"unique": _("A user with that username already exists.")},
+    )
 
 
+# Assign a staff member to an academic level and session for advising.
 class AdviserAssignment(models.Model):
     staff = models.ForeignKey(
         settings.AUTH_USER_MODEL,
@@ -32,11 +43,13 @@ class AdviserAssignment(models.Model):
             ),
         ]
 
+    # Show the assignment's owner, level, and session in admin and logs.
     def __str__(self):
         return (
             f"{self.staff.username} — " f"{self.level} level ({self.academic_session})"
         )
 
+    # Validate the session range, staff role, and positive academic level.
     def clean(self):
         super().clean()
         errors = {}
@@ -60,7 +73,9 @@ class AdviserAssignment(models.Model):
             raise ValidationError(errors)
 
 
+# Store an adviser's message together with the recipients selected at send time.
 class AdviserMessage(models.Model):
+    # Distinguish a single-recipient message from a level-wide announcement.
     class Audience(models.TextChoices):
         INDIVIDUAL = "individual", "Individual student"
         LEVEL = "level", "Assigned level"
@@ -88,12 +103,15 @@ class AdviserMessage(models.Model):
             ("send_adviser_message", "Can send adviser messages"),
         ]
 
+    # Display the message subject in admin and related-object listings.
     def __str__(self):
         return self.subject
 
 
 
+# Store HOD announcements and the student or adviser recipients selected at send time.
 class HODMessage(models.Model):
+    # Identify whether the HOD message targets an adviser, student, or level.
     class Audience(models.TextChoices):
         ADVISER = "adviser", "Assigned adviser"
         INDIVIDUAL = "individual", "Individual student"
@@ -114,5 +132,22 @@ class HODMessage(models.Model):
     class Meta:
         ordering = ["-created_at", "-id"]
 
+    # Display the message subject in admin and related-object listings.
     def __str__(self):
         return self.subject
+
+
+class AccountAdministrationAudit(models.Model):
+    """Credential-free audit of HOD staff, assignment and ownership changes."""
+    actor = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT,
+        related_name="account_administration_actions")
+    target = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT,
+        related_name="account_administration_history")
+    action = models.CharField(max_length=30)
+    before = models.JSONField(default=dict)
+    after = models.JSONField(default=dict)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-created_at", "-id"]
+        default_permissions = ()

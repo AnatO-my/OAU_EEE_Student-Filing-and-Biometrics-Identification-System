@@ -2,9 +2,11 @@ from django.contrib.auth.models import Group, Permission
 from django.core.management.base import BaseCommand, CommandError
 
 
+# Create or refresh the standard groups used for student-record access.
 class Command(BaseCommand):
     help = "Create or update the standard student-access groups."
 
+    # Ensure required student permissions exist before assigning them to groups.
     def handle(self, *args, **options):
         group_actions = {
             "Student Readers": ["view"],

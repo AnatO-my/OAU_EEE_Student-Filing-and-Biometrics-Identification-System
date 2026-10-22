@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <title>EEE — Two directions</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+
+<body>
+    <div class="direction-bar"><a class="wordmark" href="index.html">EEE / DESIGN STUDIES</a>
+        <nav aria-label="Prototype direction"><a href="?theme=motion" data-direction="motion">01 — In motion</a><a
+                href="?theme=files" data-direction="files">02 — The filing room</a><a
+                href="http://127.0.0.1:5173/guardian-results/" target="_blank" rel="noopener noreferrer"
+                title="Separate live page; departmental HOD sign-in required">Guardian result emails ↗</a></nav>
+        <span>INTERACTIVE PROTOTYPES · SYNTHETIC DATA</span>
+    </div>
+    <main id="app"></main>
+    <dialog id="record">
+        <form method="dialog"><button class="close" aria-label="Close dialog">×</button></form>
+        <div id="record-content"></div>
+    </dialog>
+    <script>const script = document.createElement('script'); script.src = new URLSearchParams(location.search).get('theme') === 'motion' ? 'app.js' : 'workspace.js'; document.body.append(script);</script>
+</body>
+
+</html>

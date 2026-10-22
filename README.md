@@ -17,7 +17,7 @@ The software design and delivery plan (SW-PLAN-01, version 0.1, 29 September 202
 - Demonstrate an authenticated identity workflow using a simulated terminal before physical integration.
 - Record sensitive changes, reviews, identity outcomes, and exports in an audit trail.
 
-Public registration, student or guardian accounts, payments, attendance, SMS campaigns, mobile apps, smart cards, automated graduation decisions, and automated ePortal scraping are outside the proposed first release. A student record does not imply a login account.
+Public self-registration, guardian logins, payments, SMS campaigns, mobile apps, smart cards, automated graduation decisions, and automated ePortal scraping are outside the proposed first release. A student record does not imply a login account. The HOD can issue a linked student login separately, with a one-time setup link so the student chooses their own password; see [student logins](docs/student-accounts.md).
 
 ## Proposed architecture
 
@@ -71,9 +71,26 @@ The plan illustrates these software folders beneath `software/`; the existing sc
 
 ## Getting started
 
+For the integrated laptop setup, use [the local application guide](docs/local-laptop.md).
+It starts the React portal and Django against the verified Aiven database;
+email delivery is an explicit option. Hosting is currently deferred.
+Student registration and reviewed master-sheet imports are documented in the
+[registration guide](docs/student-registration.md) and
+[import workflow](docs/student-result-imports.md), with
+[validation and laptop update steps](docs/registration-import-validation.md).
+The redesigned inner portal and profile-linked Account settings are described in
+[the design checkpoint](docs/portal-design-checkpoint.md) and
+[staff, adviser and HOD administration](docs/account-administration.md).
+For student access, follow [the student login guide](docs/student-accounts.md).
+
 Clone this repository and open its root in your editor. Review the scope and module boundaries before adding code.
 
 Use `python manage.py` from the repository root; `app/manage.py` remains a compatibility entry point. Imported portal code is preserved under `legacy/teammate_portal/` for later review and is not active. Follow [backend-foundation.md](docs/backend-foundation.md) for installation, configuration checks, isolated tests, API contracts, and pending database setup. Development settings still use SQLite; PostgreSQL remains the intended application database. The separate React frontend is maintained by the frontend developer.
+
+For the selected free PostgreSQL integration environment, follow
+[Aiven Free PostgreSQL setup](docs/aiven-free-postgresql.md). The local helper
+uses verified TLS and prompts privately for credentials; hosted validation
+requires the new service to be running.
 
 ## Data and access boundaries
 

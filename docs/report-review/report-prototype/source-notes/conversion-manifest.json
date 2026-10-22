@@ -1,0 +1,118 @@
+[
+  {
+    "kind": "table",
+    "source_number": "1.terms",
+    "rows": 9,
+    "file": "tables/table_1_terms.tex"
+  },
+  {
+    "kind": "chapter",
+    "file": "chapter_1.tex",
+    "source": "chapter-one-revision-2026-10-17.md",
+    "source_characters": 13227
+  },
+  {
+    "kind": "table",
+    "source_number": "2.1",
+    "rows": 8,
+    "file": "tables/table_2_1.tex"
+  },
+  {
+    "kind": "table",
+    "source_number": "2.2",
+    "rows": 5,
+    "file": "tables/table_2_2.tex"
+  },
+  {
+    "kind": "figure",
+    "source_number": "2.1",
+    "file": "folder/figure-2-1-conceptual-framework.png"
+  },
+  {
+    "kind": "chapter",
+    "file": "chapter_2.tex",
+    "source": "chapter-two-revision-2026-10-17.md",
+    "source_characters": 28937
+  },
+  {
+    "kind": "table",
+    "source_number": "3.1",
+    "rows": 10,
+    "file": "tables/table_3_1.tex"
+  },
+  {
+    "kind": "figure",
+    "source_number": "3.1",
+    "file": "folder/figure-3-1-system-architecture.png"
+  },
+  {
+    "kind": "table",
+    "source_number": "3.2",
+    "rows": 11,
+    "file": "tables/table_3_2.tex"
+  },
+  {
+    "kind": "figure",
+    "source_number": "3.2",
+    "file": "folder/figure-3-2-academic-records.png"
+  },
+  {
+    "kind": "table",
+    "source_number": "3.3",
+    "rows": 6,
+    "file": "tables/table_3_3.tex"
+  },
+  {
+    "kind": "table",
+    "source_number": "3.4",
+    "rows": 4,
+    "file": "tables/table_3_4.tex"
+  },
+  {
+    "kind": "table",
+    "source_number": "3.5",
+    "rows": 5,
+    "file": "tables/table_3_5.tex"
+  },
+  {
+    "kind": "table",
+    "source_number": "3.6",
+    "rows": 10,
+    "file": "tables/table_3_6.tex"
+  },
+  {
+    "kind": "figure",
+    "source_number": "3.3",
+    "file": "folder/figure-3-3-capture-states.png"
+  },
+  {
+    "kind": "table",
+    "source_number": "3.7",
+    "rows": 9,
+    "file": "tables/table_3_7.tex"
+  },
+  {
+    "kind": "table",
+    "source_number": "3.8",
+    "rows": 7,
+    "file": "tables/table_3_8.tex"
+  },
+  {
+    "kind": "table",
+    "source_number": "3.9",
+    "rows": 10,
+    "file": "tables/table_3_9.tex"
+  },
+  {
+    "kind": "table",
+    "source_number": "3.10",
+    "rows": 6,
+    "file": "tables/table_3_10.tex"
+  },
+  {
+    "kind": "chapter",
+    "file": "chapter_3.tex",
+    "source": "chapter-three-revision-2026-10-17.md",
+    "source_characters": 49903
+  }
+]
