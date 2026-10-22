@@ -1,0 +1,86 @@
+name: eee
+
+x-backend: &backend
+  image: eee-backend:${EEE_RELEASE:-local}
+  build:
+    context: .
+    target: backend
+  env_file:
+    - path: ${EEE_ENV_FILE:-./private-data/deployment/production.env}
+      format: raw
+  environment:
+    DJANGO_SETTINGS_MODULE: config.production_settings
+    POSTGRES_SSLMODE: verify-full
+    POSTGRES_SSLROOTCERT: /run/secrets/aiven_ca
+    PSYCOPG_IMPL: python
+  secrets:
+    - aiven_ca
+  restart: unless-stopped
+  init: true
+  read_only: true
+  tmpfs:
+    - /tmp:size=64m,mode=1777
+  cap_drop: [ALL]
+  security_opt: [no-new-privileges:true]
+  stop_grace_period: 100s
+  logging:
+    driver: json-file
+    options:
+      max-size: 10m
+      max-file: "3"
+
+services:
+  api:
+    <<: *backend
+    expose: ["8000"]
+    healthcheck:
+      test: [CMD, python, deployment/healthcheck.py]
+      interval: 30s
+      timeout: 7s
+      retries: 3
+      start_period: 20s
+
+  edge:
+    image: eee-edge:${EEE_RELEASE:-local}
+    build:
+      context: .
+      target: edge
+    environment:
+      PUBLIC_HOST: ${PUBLIC_HOST:?Set the reviewed public hostname in a nonsecret compose env file}
+      TLS_EMAIL: ${TLS_EMAIL:?Set the TLS certificate contact email}
+    ports:
+      - 80:80
+      - 443:443
+      - 443:443/udp
+    depends_on:
+      api:
+        condition: service_healthy
+    volumes:
+      - caddy_data:/data
+      - caddy_config:/config
+    restart: unless-stopped
+    security_opt: [no-new-privileges:true]
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: "3"
+
+  email-worker:
+    <<: *backend
+    # Explicit opt-in only after fake delivery and the sharing gate are reviewed.
+    profiles: [email]
+    command: [python, manage.py, process_result_shares, --channel, email, --watch, --interval, "5", --limit, "25"]
+    depends_on:
+      api:
+        condition: service_healthy
+    healthcheck:
+      disable: true
+
+secrets:
+  aiven_ca:
+    file: ${EEE_CA_FILE:-./private-data/aiven/ca.pem}
+
+volumes:
+  caddy_data:
+  caddy_config:

@@ -52,3 +52,6 @@ junit.xml
 # actual test files
 /sample.pdf/
 /converter.py/
+
+# project-specific files
+docs/report-review/

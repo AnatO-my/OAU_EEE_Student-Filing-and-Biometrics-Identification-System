@@ -1,0 +1,33 @@
+encode zstd gzip
+header {
+	X-Content-Type-Options nosniff
+	Referrer-Policy same-origin
+	X-Frame-Options DENY
+}
+
+@backend path /api /api/* /admin /admin/* /health/live/ /health/ready/
+handle @backend {
+	reverse_proxy {$API_UPSTREAM:api:8000} {
+		# Both supported topologies terminate HTTPS before this proxy.
+		# Overwrite client-supplied values; no backend port is publicly exposed.
+		header_up X-Forwarded-Proto https
+	}
+}
+
+handle_path /static/* {
+	root * /srv/static
+	file_server
+}
+
+handle /assets/* {
+	root * /srv/portal
+	header Cache-Control "public, max-age=604800, immutable"
+	file_server
+}
+
+handle {
+	root * /srv/portal
+	try_files {path} /index.html
+	header Cache-Control no-store
+	file_server
+}
