@@ -1,6 +1,0 @@
-OT portable learning starter
-Snapshot: 2026-09-30
-Starter: eee-report
-Source: LaTeX-lab working tree, including local changes
-Repository: https://github.com/AnatO-my/LaTeX-lab
-Distribution: private learner starter; not a public release
