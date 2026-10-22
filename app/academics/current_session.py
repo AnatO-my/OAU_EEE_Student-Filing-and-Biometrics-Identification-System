@@ -7,12 +7,18 @@ from .services import require_hod
 
 
 # Resolve the database selection, falling back to the configured session during bootstrap.
-def current_session_name():
+def current_session_state():
     selection = CurrentAcademicSession.objects.select_related("academic_session").filter(pk=1).first()
     if selection and selection.academic_session_id:
-        return selection.academic_session.name
+        return {"academic_session": selection.academic_session_id,
+                "name": selection.academic_session.name, "source": "database"}
     # Bootstrap compatibility only, until the HOD selects a database session.
-    return settings.CURRENT_ACADEMIC_SESSION
+    return {"academic_session": None, "name": settings.CURRENT_ACADEMIC_SESSION,
+            "source": "environment"}
+
+
+def current_session_name():
+    return current_session_state()["name"]
 
 
 @transaction.atomic

@@ -7,10 +7,11 @@ import Attendance, { PendingUpload } from './Attendance';
 import ResetPassword from '../pages/ResetPassword';
 import * as api from '../api';
 import { Table } from './ui';
+import Records from './Records';
 
 vi.mock('../api', async (importOriginal) => {
   const original = await importOriginal();
-  return { ...original, listAttendanceSessions: vi.fn(), getMyAttendance: vi.fn(), getAttendanceSession: vi.fn(), listAttendanceRecords: vi.fn(), previewPendingCaptures: vi.fn(), importPendingCaptures: vi.fn(), confirmPasswordReset: vi.fn() };
+  return { ...original, listAttendanceSessions: vi.fn(), getMyAttendance: vi.fn(), getAttendanceSession: vi.fn(), listAttendanceRecords: vi.fn(), previewPendingCaptures: vi.fn(), importPendingCaptures: vi.fn(), confirmPasswordReset: vi.fn(), listStudents: vi.fn(), getStudent: vi.fn(), uploadStudentDocument: vi.fn() };
 });
 
 afterEach(cleanup);
@@ -24,6 +25,20 @@ function portal(path, auth) {
 }
 
 describe('authenticated live workspace', () => {
+  it('shows document upload in the active student record only with document permission', async () => {
+    const record = { student_id: 'student-one', full_name: 'Synthetic document student', identifier_type: 'matriculation', identifier_value: 'EEE/2026/001', current_level: 300, is_active: true };
+    api.listStudents.mockResolvedValue({ results: [record], count: 1, next: null }); api.getStudent.mockResolvedValue(record);
+    const readOnly = { ...staff, permissions: ['students.view_student'] };
+    const view = (user) => <MemoryRouter initialEntries={['/?student=student-one']}><Records section="students" user={user} /></MemoryRouter>;
+    const page = render(view(readOnly)); await screen.findByRole('heading', { name: 'Student record' }); await screen.findByText('EEE/2026/001', { selector: 'dd' });
+    expect(screen.queryByRole('heading', { name: 'Upload student document' })).toBeNull();
+    page.rerender(view({ ...readOnly, permissions: [...readOnly.permissions, 'documents.add_studentdocument'] })); expect(screen.getByRole('heading', { name: 'Upload student document' })).toBeTruthy();
+    api.uploadStudentDocument.mockResolvedValue({ original_filename: 'synthetic.pdf', status: 'accepted', quality_notes: '' });
+    const file = new File(['%PDF-synthetic'], 'synthetic.pdf', { type: 'application/pdf' }); fireEvent.change(screen.getByLabelText('Scanned document'), { target: { files: [file] } });
+    fireEvent.click(screen.getByLabelText('I have checked the student, document type and replacement.')); fireEvent.click(screen.getByRole('button', { name: 'Upload document' }));
+    await screen.findByText('synthetic.pdf: Accepted.', { exact: false }); expect(api.uploadStudentDocument).toHaveBeenCalledWith('student-one', file, 'result');
+  });
+
   it('does not render a role workspace until the session is checked', () => {
     portal('/portal/hod/dashboard', { user: null, status: 'loading' });
     expect(screen.getByRole('status').textContent).toContain('Checking your session');

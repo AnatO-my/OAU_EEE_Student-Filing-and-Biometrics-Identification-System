@@ -29,7 +29,7 @@ def main():
     parser.add_argument("--skip-tests", action="store_true", help="Prepare a fresh synthetic cluster and optional backup drill only")
     parser.add_argument("--restore-archive", type=Path, help="Verify an existing archive in this fresh disposable cluster")
     parser.add_argument("--backup-client-bin", type=Path, help="Optional separate pg_dump/pg_restore client directory")
-    parser.add_argument("labels", nargs="*", default=["students", "accounts", "academics", "attendance", "record_imports"])
+    parser.add_argument("labels", nargs="*", default=["students", "accounts", "academics", "attendance", "record_imports", "documents"])
     args = parser.parse_args()
     suffix = ".exe" if os.name == "nt" else ""
     pg_bin = args.pg_bin.resolve()

@@ -318,8 +318,9 @@ def require_guardian_access(user, student, action):
             and user.has_perm("students." + action)):
         raise PermissionDenied("You do not have permission for this guardian action.")
     if not user.is_superuser:
-        if not current_session_name() or not AdviserAssignment.objects.select_for_update().filter(
-            staff=user, academic_session=current_session_name(),
+        session = current_session_name()
+        if not session or not AdviserAssignment.objects.select_for_update().filter(
+            staff=user, academic_session=session,
             level=student.current_level, is_active=True,
         ).exists():
             raise PermissionDenied("The student is outside your adviser assignment.")

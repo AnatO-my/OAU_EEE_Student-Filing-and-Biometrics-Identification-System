@@ -97,6 +97,7 @@ INSTALLED_APPS = [
     "academics.apps.AcademicsConfig",
     "attendance.apps.AttendanceConfig",
     "record_imports.apps.RecordImportsConfig",
+    "documents.apps.DocumentsConfig",
 ]
 
 MIDDLEWARE = [
@@ -181,6 +182,13 @@ STATIC_URL = "static/"
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
+
+# Student documents are private and must never be served as public static files.
+PRIVATE_MEDIA_ROOT = os.environ.get("PRIVATE_MEDIA_ROOT") or str(BASE_DIR / "private_media")
+DOCUMENT_MAX_UPLOAD_BYTES = 10 * 1024 * 1024
+DOCUMENT_OCR_MIN_CONFIDENCE = 60
+DOCUMENT_OCR_MIN_CHARACTERS = 50
+DOCUMENT_OCR_BACKEND = "documents.ocr.placeholder_extract_text"
 
 # Production requires a stable secret and deployment-specific settings.
 if not DEBUG and not os.environ.get("DJANGO_SECRET_KEY"):

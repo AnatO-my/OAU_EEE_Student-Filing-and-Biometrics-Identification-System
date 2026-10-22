@@ -1,8 +1,8 @@
 from rest_framework import serializers
 from rest_framework.response import Response
 from rest_framework.views import APIView
-from .models import AcademicSession, CurrentAcademicSession
-from .current_session import current_session_name, select_current_session
+from .models import AcademicSession
+from .current_session import current_session_state, select_current_session
 from .views import IsActiveHOD, run_academic_service
 
 
@@ -18,9 +18,7 @@ class CurrentSessionView(APIView):
 
     # Report both the selected session and whether it came from the database or environment.
     def get(self, request):
-        row = CurrentAcademicSession.objects.filter(pk=1).first()
-        return Response({"academic_session": row.academic_session_id if row else None,
-            "name": current_session_name(), "source": "database" if row and row.academic_session_id else "environment"})
+        return Response(current_session_state())
 
     # Validate and apply the HOD's session selection, then return the updated representation.
     def put(self, request):

@@ -5,6 +5,7 @@ import { Alert, Empty, Pager, RemoteState, Table } from './ui';
 import { formatDate, hasPermission, useRemote } from './resources';
 import StudentRegistration, { PromoteIdentifier, StudentProfileEditor } from './StudentRegistration';
 import StudentLogin from './StudentLogin';
+import DocumentUpload from '../pages/DocumentUpload';
 
 function Profile({ row }) {
   return <dl className="live-details">{[
@@ -45,7 +46,7 @@ function StudentDetail({ studentId, user, onClose }) {
   const guardians = useRemote((signal) => canRead ? api.listGuardians(studentId, page, signal) : Promise.resolve(null), [studentId, page, canRead]);
   function saved() { setNotice('Guardian details saved. Review result-sharing consent separately before sending.'); guardians.reload(); }
   return <section className="live-card"><div className="live-row"><h2>Student record</h2><button onClick={onClose}>Close record</button></div>
-    <RemoteState resource={profile}>{(row) => <><Profile row={row} /><StudentProfileEditor row={row} user={user} onSaved={profile.reload} /><PromoteIdentifier key={`promote:${row.identifier_value}`} row={row} user={user} onSaved={profile.reload} /><StudentLogin studentId={row.student_id} identifierValue={row.identifier_value} identifierType={row.identifier_type} user={user} studentActive={row.is_active} /></>}</RemoteState>
+    <RemoteState resource={profile}>{(row) => <><Profile row={row} /><StudentProfileEditor row={row} user={user} onSaved={profile.reload} /><PromoteIdentifier key={`promote:${row.identifier_value}`} row={row} user={user} onSaved={profile.reload} /><StudentLogin studentId={row.student_id} identifierValue={row.identifier_value} identifierType={row.identifier_type} user={user} studentActive={row.is_active} />{hasPermission(user, 'documents.add_studentdocument') && <DocumentUpload key={`documents:${row.student_id}`} studentId={row.student_id} />}</>}</RemoteState>
     {canRead && <><h3>Guardians</h3>{notice && <p role="status">{notice}</p>}<RemoteState resource={guardians}>{(data) => <>
       {!data.results.length && <Empty>No guardians have been recorded.</Empty>}
       {data.results.map((row) => <article key={row.guardian_id} className="live-inset"><h4>{row.full_name}</h4><p>{row.relationship} · {row.email || 'No email'} · {row.phone_number || 'No phone'}</p>

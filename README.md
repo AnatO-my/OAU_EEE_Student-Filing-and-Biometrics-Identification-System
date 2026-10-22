@@ -82,6 +82,10 @@ The redesigned inner portal and profile-linked Account settings are described in
 [the design checkpoint](docs/portal-design-checkpoint.md) and
 [staff, adviser and HOD administration](docs/account-administration.md).
 For student access, follow [the student login guide](docs/student-accounts.md).
+Student records also retain the document-upload workflow from main. Authorised
+staff can attach private PDF or image documents to a student record; uploads need
+manual review while the OCR backend is unconfigured. Include the private media
+directory when planning application backups.
 
 Clone this repository and open its root in your editor. Review the scope and module boundaries before adding code.
 
@@ -120,3 +124,8 @@ Before implementing document storage, agree file categories, reference numbers, 
 Read [CONTRIBUTING.md](CONTRIBUTING.md) for branch, review, validation, and data-handling rules. Use a branch for each focused change and submit a pull request describing the behaviour, validation performed, and any unresolved decisions. Keep documentation and contracts aligned with implementation. Changes to academic rules, access policies, and data-source assumptions require review by the appropriate project or departmental owner.
 
 No software licence has been selected yet. Record the agreed licence and repository ownership before broader distribution.
+
+## List of Contributors
+
+- faheezah
+- AnatO-my

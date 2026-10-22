@@ -1,4 +1,5 @@
 from django.contrib import admin
+from django.core.exceptions import ValidationError
 
 from accounts.admin_access import HODOnlyAdminMixin
 from .models import GradingScale
@@ -41,8 +42,12 @@ class AcademicSessionAdmin(HODOnlyAdminMixin, admin.ModelAdmin):
             self.message_user(request, "Select exactly one academic session.", messages.ERROR)
             return
         selection = CurrentAcademicSession.objects.get(pk=1)
-        select_current_session(user=request.user, academic_session=queryset.get(),
-            expected_session_id=selection.academic_session_id)
+        try:
+            select_current_session(user=request.user, academic_session=queryset.get(),
+                expected_session_id=selection.academic_session_id)
+        except ValidationError as error:
+            self.message_user(request, " ".join(error.messages), messages.ERROR)
+            return
         self.message_user(request, "Current academic session updated. Existing assignments and classes were preserved.")
 
     # Retain referenced academic sessions for assignments and results.

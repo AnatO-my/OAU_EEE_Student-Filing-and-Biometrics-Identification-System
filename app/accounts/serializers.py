@@ -68,10 +68,12 @@ class CurrentUserSerializer(serializers.ModelSerializer):
 
     # List distinct active adviser levels for the configured academic session.
     def get_adviser_levels(self, user):
-        from django.conf import settings
-        if not current_session_name() or not user.is_active or not user.is_staff:
+        if not user.is_active or not user.is_staff:
             return []
-        return list(user.adviser_assignments.filter(academic_session=current_session_name(),
+        session = current_session_name()
+        if not session:
+            return []
+        return list(user.adviser_assignments.filter(academic_session=session,
             is_active=True).order_by("level").values_list("level", flat=True).distinct())
 
     # Map account flags to the frontend's HOD, staff, or student role.

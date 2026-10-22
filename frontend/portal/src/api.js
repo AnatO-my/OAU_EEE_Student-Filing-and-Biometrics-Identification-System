@@ -2,6 +2,15 @@ let csrfToken = null;
 let csrfRequest = null;
 let sessionEpoch = 0;
 const sessionListeners = new Set();
+const sessionChecks = new Set();
+
+// Legacy consumers may observe a permission-triggered identity check. The
+// transport still performs its own probe so clearing an expired session does
+// not depend on a particular page subscribing.
+export function subscribeSessionCheck(listener) {
+  sessionChecks.add(listener);
+  return () => sessionChecks.delete(listener);
+}
 
 export function subscribeSessionLost(listener) {
   sessionListeners.add(listener);
@@ -23,7 +32,7 @@ function sessionLost() {
 // removing a signed-in user's private workspace after an ordinary 403.
 async function checkForbiddenSession(started) {
   try {
-    const response = await fetch('/api/auth/me/', {
+    const response = await fetch(buildApiUrl('/api/auth/me/'), {
       credentials: 'same-origin', cache: 'no-store', headers: { Accept: 'application/json' },
     });
     if (started === sessionEpoch && [401, 403].includes(response.status)) sessionLost();
@@ -74,8 +83,12 @@ function requestErrorMessage(details, status) {
 
 export async function apiRequest(
   path,
-  { method = "GET", query = {}, body, rawBody = false, signal, responseType = "json", headers: extraHeaders = {} } = {},
+  { method = "GET", query = {}, body, rawBody, signal, responseType = "json", headers: extraHeaders = {} } = {},
 ) {
+  if (body !== undefined && rawBody !== undefined && rawBody !== true && rawBody !== false) throw new TypeError('Choose a JSON body or a raw body.');
+  const url = buildApiUrl(path, query);
+  const rawEncoding = rawBody === true || (rawBody !== undefined && rawBody !== false);
+  const encodedBody = rawBody === true ? body : rawEncoding ? rawBody : body === undefined ? undefined : JSON.stringify(body);
   const started = sessionEpoch;
   const verb = method.toUpperCase();
   const headers = {
@@ -87,19 +100,19 @@ export async function apiRequest(
   if (isWrite) {
     headers["X-CSRFToken"] = await getCsrfToken();
   }
-  if (body !== undefined && !rawBody) {
+  if (body !== undefined && !rawEncoding) {
     headers["Content-Type"] = "application/json";
   }
   if (started !== sessionEpoch) throw new ApiError('The session changed. Sign in again.', 401);
 
   let response;
   try {
-    response = await fetch(buildApiUrl(path, query), {
+    response = await fetch(url, {
     method: verb,
     credentials: "same-origin",
     cache: "no-store",
     headers,
-    body: body === undefined ? undefined : rawBody ? body : JSON.stringify(body),
+    body: encodedBody,
     signal,
   });
   } catch (error) {
@@ -120,6 +133,7 @@ export async function apiRequest(
     }
     if (response.status === 403 && isWrite) { csrfToken = null; csrfRequest = null; }
     if (!path.startsWith('/api/auth/login/') && !path.startsWith('/api/auth/password/reset/') && !path.startsWith('/api/auth/student/setup/')) {
+      if ([401, 403].includes(response.status) && !['/api/auth/me/', '/api/auth/csrf/', '/api/auth/logout/'].includes(path)) sessionChecks.forEach((listener) => listener());
       if (response.status === 401 || (response.status === 403 && path === '/api/auth/me/')) sessionLost();
       else if (response.status === 403) await checkForbiddenSession(started);
     }
@@ -703,4 +717,11 @@ export async function collectPages(loader, signal) {
 
 export function listPendingCaptureBatches(sessionId, page = 1, signal) {
   return apiGet(`/api/attendance/sessions/${pathId(sessionId)}/pending-batches/`, { page }, signal);
+}
+
+export function uploadStudentDocument(studentId, file, documentType) {
+  const form = new FormData();
+  form.set('file', file);
+  form.set('document_type', documentType);
+  return apiRequest(`/api/students/${pathId(studentId)}/documents/`, { method: 'POST', rawBody: form });
 }
