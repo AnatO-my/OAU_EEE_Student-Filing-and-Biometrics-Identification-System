@@ -50,8 +50,8 @@ junit.xml
 *.tmp
 
 # actual test files
-/sample.pdf/
-/converter.py/
+sample.pdf
+
 
 # project-specific files
 docs/report-review/
