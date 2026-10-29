@@ -1,4 +1,5 @@
 import { useRef, useState } from 'react';
+import SourceComparisons from './SourceComparisons';
 import { Link } from 'react-router-dom';
 import * as api from '../api';
 import { Alert, Empty, Pager, RemoteState, Table } from './ui';
@@ -42,8 +43,8 @@ export default function RecordImports({ user }) {
   function changeContext(name, value) {
     sequence.current += 1; setContext((old) => ({ ...old, [name]: value })); setRequestId(file ? crypto.randomUUID() : ''); resetPreview();
   }
-  async function requestPreview(csvText, filename, started) {
-    const data = await api.previewRecordImport({ kind: 'results', request_id: requestId, filename, csv_text: csvText });
+  async function requestPreview(csvText, filename, started, sourceContext) {
+    const data = await api.previewRecordImport({ kind: 'results', request_id: requestId, filename, csv_text: csvText, ...(sourceContext ? { source_context: sourceContext } : {}) });
     if (started !== sequence.current) return;
     setBatch(data); setStale(false); setHistoryRevision((value) => value + 1);
   }
@@ -58,7 +59,7 @@ export default function RecordImports({ user }) {
       const source = await api.prepareRecordImport(file, context);
       if (started !== sequence.current) return;
       if (source.format !== 'canonical_csv') setPrepared(source);
-      if (source.summary.accepted_rows) await requestPreview(source.csv_text, source.filename, started);
+      if (source.summary.accepted_rows) await requestPreview(source.csv_text, source.filename, started, source.source_context);
     } catch (err) {
       if (started === sequence.current) {
         if (err.status === 400) setContextExpanded(true);
@@ -121,7 +122,7 @@ export default function RecordImports({ user }) {
       {!!prepared.summary.unresolved_rows && <p className="live-alert">The converted CSV contains only the ready rows. Undecided NG or unreadable marks are held for review, and recorded zeros need source confirmation above. Nothing missing is replaced with zero. Review the excluded entries before saving any ready scores.</p>}
       {!prepared.summary.accepted_rows && <p className="live-alert">No scores are ready for database matching. Resolve the entries below, then convert the source again.</p>}
       <div className="live-downloads"><a download={prepared.filename} href={`data:text/csv;charset=utf-8,${encodeURIComponent(prepared.csv_text)}`}>Download prepared results CSV</a><a download="conversion-report.json" href={`data:application/json;charset=utf-8,${encodeURIComponent(JSON.stringify({ format: prepared.format, source_filename: file?.name, prepared_filename: prepared.filename, source_sha256: prepared.source_sha256, summary: prepared.summary, reviewed_context: prepared.reviewed_context || {}, complete_history: prepared.complete_history ?? false }, null, 2))}`}>Download conversion report</a><a download="extraction-issues.json" href={`data:application/json;charset=utf-8,${encodeURIComponent(JSON.stringify(prepared.issues, null, 2))}`}>Download issue report</a><a download="extraction-trace.json" href={`data:application/json;charset=utf-8,${encodeURIComponent(JSON.stringify(prepared.trace, null, 2))}`}>Download source trace</a></div>
-      <p className="live-hint">Keep the original PDF or converter file and these reports privately with the department’s source records. The saved import contains the prepared CSV, not the original PDF and conversion reports.</p>
+      <p className="live-hint">Keep the original PDF or converter file and these reports privately with the department’s source records. The saved import retains the prepared CSV and supplied source context, including reported averages and extraction fields; keep the original file and separate conversion reports privately.</p>
       <details><summary>Prepared CSV rows</summary><pre className="live-source-preview">{prepared.csv_text}</pre></details>
       {!!prepared.issues.length && <Table headings={['Source', 'Student / course', 'Original mark', 'Issue']}>
         {prepared.issues.map((issue, index) => <tr key={index}><td>Record {issue.source_record ?? '—'} · Page {issue.source_page ?? '—'} · Table {issue.source_table ?? '—'}</td><td>{issue.identifier_value || 'Unresolved identifier'}<br />{issue.course_code || 'Unresolved course'}</td><td>{issue.raw_result ?? 'Not recorded'}</td><td>{issue.message || issue.code}</td></tr>)}
@@ -131,6 +132,7 @@ export default function RecordImports({ user }) {
     {batch && <section className="live-card"><div className="live-row"><h2>{batch.receipt ? 'Saved import' : 'Review import'}</h2><button disabled={busy} onClick={() => loadBatch(batch.id, !batch.receipt && !uncertain)}>{uncertain ? 'Check saved receipt' : batch.receipt ? 'Reload saved receipt' : 'Refresh preview after changes'}</button></div>
       <p><strong>{batch.filename}</strong> · Result upload · Preview revision {batch.revision}</p>
       <details><summary>Import reference</summary><p className="live-hint">{batch.id}<br />File SHA-256: {batch.file_sha256}</p></details>
+      <SourceComparisons reports={batch.source_performance} importing />
       {batch.receipt ? <Receipt value={batch.receipt} recovered={recovered} /> : <><Summary value={batch.summary} />
         {!!batch.summary.blocked && <p className="live-alert">This upload is on hold until the flagged rows are resolved. Register missing students separately under Students, then reopen this upload from history and refresh its preview. No results from this batch are saved while a row is blocked.</p>}
         {uncertain && <p className="live-alert">Keep this import reference. The saved receipt records whether the transaction completed. Do not upload another copy to recover an uncertain outcome.</p>}

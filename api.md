@@ -1139,7 +1139,8 @@ visibility, including historical classes; new classes must use current offerings
 | --- | --- | --- | --- |
 | `getAttendanceRoster` | `GET /api/attendance/offerings/{offering_id}/roster/` | HOD; `page` | 200 paginated candidates plus `confirmed_revision`, `confirmed_student_ids`. |
 | `confirmAttendanceRoster` | `PUT /api/attendance/offerings/{offering_id}/roster/` | HOD; `student_ids` (1–1000 unique UUIDs), `expected_revision` (0 initially) | 200 `{revision, student_ids}`. |
-| `setAttendanceStaff` | `PUT /api/attendance/offerings/{offering_id}/staff/` | HOD; `staff` account integer ID, `is_active` boolean | 200 `{id, staff, is_active}`; this is not a staff-directory/list API. |
+| `listAttendanceStaff` | `GET /api/attendance/offerings/{offering_id}/staff/` | HOD; `page` | 200 paginated offering assignments: `id`, `staff`, `staff_username`, `staff_name`, `staff_is_active`, `is_active`; includes inactive assignments, no email/private account data. |
+| `setAttendanceStaff` | `PUT /api/attendance/offerings/{offering_id}/staff/` | HOD; `staff` account integer ID, `is_active` boolean | 200 `{id, staff, is_active}` through the existing assignment service. |
 | `listAttendanceSessions` | `GET /api/attendance/sessions/` | HOD or scoped attendance reader; `page` | 200 paginated visible classes. |
 | `openAttendanceSession` | `POST /api/attendance/sessions/` | HOD or scoped staff + `attendance.manage_attendance`; `offering`, `title`, `starts_at`, `ends_at` | 201 class. |
 | `getAttendanceSession` | `GET /api/attendance/sessions/{session_id}/` | HOD or scoped attendance reader | 200 class plus frozen `student_ids`. |
@@ -1635,6 +1636,23 @@ sheet. Unknown matric numbers hold the batch until separate student registration
 and a preview refresh; result upload never creates student records.
 `GET /api/imports/?kind=results` returns result-only history before pagination.
 Unsupported/scanned layouts and XLSX require a separate reviewed conversion.
+
+Reported-average extension (23 October): preparation returns optional
+source_context (format, source_sha256, csv_sha256, parser records); submit it
+unchanged with preview's CSV. It participates in idempotency and stale review.
+Import responses expose source_performance; commit retains immutable
+SourcePerformance observations with unresolved review status. Numerical GPA/CGPA
+differences do not block otherwise valid records or bypass other blocking errors.
+Existing scoped staff/own-student GPA/CGPA responses add source_reports containing
+reported figures, current comparison, comparison_at_import and provenance.
+Existing gpa/cgpa remain system calculations. The portal emphasizes calculated
+values and displays the unresolved indicator/source details. Previous reported
+GPA is retained separately, never compared to the current period. Two-decimal
+half-up comparison with zero tolerance is an interim implementation convention;
+complete history, resolution and institutional precision policy remain undecided.
+See the linked import contract for metric states, provisional calculations and
+migration record_imports.0002. The PDF converter performs no OCR and only parses
+the defined two-row layout; filing JPG/PNG documents remains a separate feature.
 
 ### 10.7 HOD staff, adviser and ownership administration
 

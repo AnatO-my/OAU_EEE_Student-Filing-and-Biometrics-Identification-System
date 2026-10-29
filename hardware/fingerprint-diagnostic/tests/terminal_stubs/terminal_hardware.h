@@ -1,17 +1,18 @@
 #pragma once
 #include "terminal_logic.h"
 #include "terminal_feedback.h"
+#include "terminal_screen.h"
 #include <string>
 #include <vector>
 
 namespace terminal {
-struct Screen { char line[8][22] = {}; };
 class TerminalHardware {
 public:
   bool oledOK=false,rtcOK=false,fsOK=false,clockPresent=false,setOK=false;
   bool buttons[3]={};
   DateTime clock;
   Screen last;
+  uint8_t pixels[OLED_FRAME_BYTES]={};
   LogResult nextRecord=LogResult::Saved;
   unsigned writes=0,formats=0,exports=0,clockWrites=0;
   int feedback=0;
@@ -31,6 +32,6 @@ public:
   bool exportLog() { ++exports; return fsOK; }
   bool formatStorage() { ++formats; return fsOK=true; }
   void contrast(bool) {}
-  void show(const Screen &screen) { last=screen; }
+  void show(const Screen &screen) { last=screen; renderScreen(screen,pixels); }
 };
 } // namespace terminal

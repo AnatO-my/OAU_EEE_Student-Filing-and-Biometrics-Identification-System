@@ -1,5 +1,5 @@
 import { lazy, Suspense } from "react";
-import { BrowserRouter as Router, Navigate, Routes, Route } from "react-router-dom";
+import { BrowserRouter as Router, Navigate, Routes, Route, useLocation } from "react-router-dom";
 import Landing from "./pages/Landing";
 import Login from "./pages/Login";
 import AppLayout from "./Applayout";
@@ -11,13 +11,16 @@ import { AuthProvider } from "./auth/AuthContext";
 import ResetPassword from './pages/ResetPassword';
 import SetupStudent from './pages/SetupStudent';
 import { useAuth } from './auth/useAuth';
+import { messageReturnPath } from './auth/messageReturnPath';
 
 const Portal = lazy(() => import("./live/LivePortal"));
 
 function PortalRedirect({ section = 'dashboard' }) {
   const { user, status } = useAuth();
+  const location = useLocation();
   if (status === 'loading') return <p role="status">Checking your session…</p>;
-  return <Navigate to={user ? `/portal/${user.role}/${section}` : '/login'} replace />;
+  const source = location.pathname + location.search;
+  return <Navigate to={user ? messageReturnPath(user.role, source) || `/portal/${user.role}/${section}` : '/login'} state={user ? undefined : { from: source }} replace />;
 }
 
 function App() {

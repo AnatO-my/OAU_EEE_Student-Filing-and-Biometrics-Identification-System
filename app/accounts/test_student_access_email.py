@@ -41,7 +41,8 @@ class StudentAccessEmailTests(StudentSetupFixture, TestCase):
     def test_new_setup_defaults_to_exact_matric_and_sign_in_preserves_slashes_and_zeros(self):
         self.student.identifier_value = "TEST/2026/0001"
         self.student.save(update_fields=["identifier_value"])
-        response = self.client.post(self.issue_url, {"email": "student@example.test"}, format="json")
+        self.seed_legacy_account(username=self.student.identifier_value,email="student@example.test")
+        response = self.client.post(self.issue_url, {}, format="json")
         self.assertEqual(response.status_code, 200, response.data)
         self.assertEqual(response.data["account"]["username"], "TEST/2026/0001")
         confirm_student_setup(**self.confirm_body(response.data))

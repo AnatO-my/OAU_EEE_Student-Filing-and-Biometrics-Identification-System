@@ -5,7 +5,7 @@ $taskOutput = Join-Path $taskRoot '.pio\host-tests'
 New-Item -ItemType Directory -Force -Path $taskOutput | Out-Null
 Push-Location $taskRoot
 try {
-    foreach ($suite in @('protocol', 'firmware', 'enrollment', 'template_transfer', 'terminal_logic', 'terminal', 'terminal_modes', 'terminal_feedback', 'oled_pages', 'accuracy_statistics', 'wifi_transfer_format')) {
+    foreach ($suite in @('protocol', 'firmware', 'enrollment', 'template_transfer', 'terminal_logic', 'terminal', 'terminal_modes', 'terminal_feedback', 'terminal_screen', 'oled_pages', 'oled_integrity_patterns', 'accuracy_statistics', 'wifi_transfer_format')) {
         $taskExecutable = Join-Path $taskOutput ($suite + '_test.exe')
         & $Compiler -std=c++11 -Wall -Wextra -Werror -I tests/terminal_stubs -I tests/stubs -I include ('tests/' + $suite + '_test.cpp') -o $taskExecutable
         if ($LASTEXITCODE -ne 0) { throw "Compilation failed: $suite" }

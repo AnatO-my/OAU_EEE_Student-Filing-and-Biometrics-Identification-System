@@ -3,6 +3,7 @@
 [CmdletBinding()]
 param(
     [switch]$EmailWorker,
+    [switch]$TeachingNotifications,
     [switch]$CheckOnly,
     [ValidateRange(1,65535)][int]$BackendPort = 8000,
     [ValidateRange(1,65535)][int]$FrontendPort = 5175
@@ -17,6 +18,7 @@ if (-not (Test-Path -LiteralPath $localPythonPath -PathType Leaf)) {
 $localLaunchArguments = @((Join-Path $PSScriptRoot 'run_local.py'))
 $localLaunchArguments += @('--backend-port', [string]$BackendPort, '--frontend-port', [string]$FrontendPort)
 if ($EmailWorker) { $localLaunchArguments += '--email-worker' }
+if ($TeachingNotifications) { $localLaunchArguments += '--teaching-notifications' }
 if ($CheckOnly) { $localLaunchArguments += '--check-only' }
 & $localPythonPath @localLaunchArguments
 if ($LASTEXITCODE -ne 0) {

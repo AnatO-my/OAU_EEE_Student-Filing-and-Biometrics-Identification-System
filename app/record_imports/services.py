@@ -16,7 +16,8 @@ from students.models import Student
 from students.services import create_student
 
 from .format import parse_csv, validate_identity, roster_values, result_values
-from .models import ImportBatch, ImportChange, ImportMutex
+from .models import ImportBatch, ImportChange, ImportMutex, SourcePerformance
+from .performance import preview_performance, validate_source_context
 
 
 class ImportConflict(ValidationError):
@@ -65,7 +66,7 @@ def name_key(value):
     return " ".join(value.split()).casefold()
 
 
-def build_preview(user, kind, rows):
+def build_preview(user, kind, rows, source_context=None):
     context = access_context(user, kind)
     output, states, seen = [], [], set()
     summary = {"total": len(rows), "new_students": 0, "new_results": 0, "unchanged": 0, "corrections": 0, "blocked": 0}
@@ -152,7 +153,10 @@ def build_preview(user, kind, rows):
             summary[{"create_student": "new_students", "create_result": "new_results", "unchanged": "unchanged", "correction": "corrections"}[row["action"]]] += 1
         output.append(row)
         states.append(state)
-    return {"rows": output, "summary": summary, "context": context, "states": states}
+    preview = {"rows": output, "summary": summary, "context": context, "states": states}
+    if source_context:
+        preview["source_performance"] = preview_performance(source_context, output)
+    return preview
 
 
 def public_batch(batch):
@@ -161,7 +165,12 @@ def public_batch(batch):
         "revision": batch.revision, "preview_digest": batch.preview_digest,
         "summary": batch.preview["summary"], "rows": batch.preview["rows"],
         "can_commit": batch.status == "preview" and batch.preview["summary"]["blocked"] == 0,
-        "receipt": batch.receipt, "created_at": batch.created_at.isoformat()}
+        "receipt": batch.receipt, "created_at": batch.created_at.isoformat(),
+        "source_context": batch.source_context,
+        "source_performance": [{**item, "source_sha256": batch.source_context.get("source_sha256"),
+                                "format": batch.source_context.get("format"),
+                                "comparison": {k: v for k, v in item["comparison"].items() if k != "inputs"}}
+                               for item in batch.preview.get("source_performance", [])]}
 
 
 def require_batch_access(user, batch):
@@ -176,28 +185,31 @@ def require_batch_access(user, batch):
 
 
 @transaction.atomic
-def create_preview(*, user, kind, request_id, filename, csv_text):
+def create_preview(*, user, kind, request_id, filename, csv_text, source_context=None):
     user = fresh_user(user)
     require_access(user, kind)
     data, rows = parse_csv(kind, csv_text)
     file_hash = hashlib.sha256(data).hexdigest()
+    source_context = validate_source_context(source_context, kind, rows)
+    if source_context and source_context["csv_sha256"] != file_hash:
+        raise ValidationError("Prepared CSV changed after conversion. Prepare and review it again.")
     filename = filename.replace("\\", "/").rsplit("/", 1)[-1].strip()
     if not filename or len(filename) > 120 or any(ord(c) < 32 for c in filename) or not filename.lower().endswith(".csv"):
         raise ValidationError("Choose a CSV filename of at most 120 characters.")
     existing = ImportBatch.objects.filter(owner=user, request_id=request_id).first()
     if existing:
-        if existing.kind != kind or existing.file_sha256 != file_hash or existing.filename != filename:
+        if existing.kind != kind or existing.file_sha256 != file_hash or existing.filename != filename or existing.source_context != source_context:
             raise ImportConflict("This request ID already identifies a different file. Start a new preview request.")
         require_batch_access(user, existing)
         return existing, True
-    preview = build_preview(user, kind, rows)
+    preview = build_preview(user, kind, rows, source_context)
     try:
         with transaction.atomic():
             batch = ImportBatch.objects.create(owner=user, request_id=request_id, kind=kind, filename=filename,
-                file_sha256=file_hash, source_csv=csv_text, parsed_rows=rows, preview=preview, preview_digest=digest(preview))
+                file_sha256=file_hash, source_csv=csv_text, parsed_rows=rows, source_context=source_context, preview=preview, preview_digest=digest(preview))
     except IntegrityError:
         existing = ImportBatch.objects.get(owner=user, request_id=request_id)
-        if existing.kind != kind or existing.file_sha256 != file_hash or existing.filename != filename:
+        if existing.kind != kind or existing.file_sha256 != file_hash or existing.filename != filename or existing.source_context != source_context:
             raise ImportConflict("This request ID already identifies a different file. Start a new preview request.") from None
         require_batch_access(user, existing)
         return existing, True
@@ -211,7 +223,7 @@ def refresh_preview(*, user, batch_id):
     require_batch_access(user, batch)
     if batch.status == "committed":
         raise ImportConflict("A committed import cannot be refreshed. Start a new preview for another file.")
-    batch.preview = build_preview(user, batch.kind, batch.parsed_rows)
+    batch.preview = build_preview(user, batch.kind, batch.parsed_rows, batch.source_context)
     batch.preview_digest = digest(batch.preview)
     batch.revision += 1
     batch.save(update_fields=["preview", "preview_digest", "revision", "updated_at"])
@@ -220,7 +232,7 @@ def refresh_preview(*, user, batch_id):
 
 def lock_import_context(user, batch):
     list(CurrentAcademicSession.objects.select_for_update().filter(pk=1))
-    preliminary = build_preview(user, batch.kind, batch.parsed_rows)
+    preliminary = build_preview(user, batch.kind, batch.parsed_rows, batch.source_context)
     students = {row["student_id"] for row in preliminary["rows"] if row.get("student_id")}
     list(Student.objects.select_for_update().filter(pk__in=students).order_by("pk"))
     # Match ordinary student/result services: Student before AdviserAssignment.
@@ -231,7 +243,7 @@ def lock_import_context(user, batch):
     list(Course.objects.select_for_update().filter(pk__in={offering.course_id for offering in locked}).order_by("pk"))
     list(AcademicSession.objects.select_for_update().filter(pk__in={offering.academic_session_id for offering in locked}).order_by("pk"))
     list(GradingScale.objects.select_for_update().filter(pk__in={offering.grading_scale_id for offering in locked}).order_by("pk"))
-    list(Result.objects.select_for_update().filter(student_id__in=students, offering_id__in=offerings).order_by("pk"))
+    list(Result.objects.select_for_update().filter(student_id__in=students).order_by("pk"))
 
 
 def normalize_approvals(approvals):
@@ -269,7 +281,7 @@ def commit_import(*, user, batch_id, preview_digest, correction_approvals):
     # authorization snapshot must come from fresh queries, never User caches.
     for cache in ("_perm_cache", "_user_perm_cache", "_group_perm_cache"):
         user.__dict__.pop(cache, None)
-    current = build_preview(user, batch.kind, batch.parsed_rows)
+    current = build_preview(user, batch.kind, batch.parsed_rows, batch.source_context)
     if digest(current) != batch.preview_digest:
         raise ImportConflict("Student, result, offering or authorization data changed. Refresh and review this preview again.")
     if current["summary"]["blocked"]:
@@ -309,6 +321,10 @@ def commit_import(*, user, batch_id, preview_digest, correction_approvals):
                     student=student, result=result, before=before, after=after, reason=approvals.get(row["row_number"], ""))
     except IntegrityError:
         raise ImportConflict("An identifier or result was registered concurrently. Refresh and review this preview; no partial records were imported.") from None
+    for item in current.get("source_performance", []):
+        SourcePerformance.objects.create(batch=batch, student_id=item["student_id"],
+            academic_session=AcademicSession.objects.get(name=item["academic_session"]), semester=item["semester"],
+            source=item["source"], comparison_at_import=item["comparison"])
     batch.status = "committed"
     batch.receipt = receipt
     batch.commit_request = request

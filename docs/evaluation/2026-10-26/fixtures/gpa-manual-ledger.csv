@@ -1,0 +1,9 @@
+period,course,units,score,grade_point,quality_points
+prior 2025/2026 harmattan,EVAL101,3,72,5,15
+prior 2025/2026 harmattan,EVAL103,2,65,4,8
+prior 2025/2026 harmattan,EVAL105,3,35,0,0
+current 2026/2027 harmattan,EVAL201,3,78,5,15
+current 2026/2027 harmattan,EVAL203,3,64,4,12
+current 2026/2027 harmattan,EVAL205,2,55,3,6
+current 2026/2027 harmattan,EVAL207,2,48,2,4
+current 2026/2027 harmattan,EVAL209,1,35,0,0

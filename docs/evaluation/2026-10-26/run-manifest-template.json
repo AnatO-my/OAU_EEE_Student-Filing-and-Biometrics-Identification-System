@@ -1,0 +1,49 @@
+{
+  "stage_status": "STAGED_NOT_RUN",
+  "planned_date": "2026-10-26",
+  "timezone": "Africa/Lagos",
+  "run_id": null,
+  "observed_at": null,
+  "operator_tag": null,
+  "app_revision": null,
+  "dirty_worktree_status_file": null,
+  "backend_settings": null,
+  "scratch_database_path": null,
+  "private_files_root": null,
+  "email_backend": null,
+  "fixture_manifest_path": null,
+  "planned_case_ids": [],
+  "planned_repetitions": {},
+  "role_handles": {
+    "EVAL-HOD": null,
+    "EVAL-HOD-SUCCESSOR": null,
+    "EVAL-ADVISER": null,
+    "EVAL-LECTURER": null,
+    "EVAL-UNASSIGNED": null,
+    "EVAL-STUDENT-A": null,
+    "EVAL-STUDENT-B": null,
+    "EVAL-SETUP": null
+  },
+  "devices": [],
+  "hardware": {
+    "board": null,
+    "firmware_revision_build": null,
+    "scanner_model_firmware": null,
+    "uart_baud": null,
+    "security_level": null,
+    "active_gallery_generation": null,
+    "active_gallery_occupied_capacity": null,
+    "selected_reference_slot": null,
+    "batch_uuid": null,
+    "meeting_uuid": null,
+    "clock_source_and_trust": null,
+    "controlled_input_authorisation": null
+  },
+  "notes": [
+    "Copy this template privately and fill actual metadata before the run.",
+    "Staging is not an observed evaluation result.",
+    "Do not place credentials, raw probes or student records in tracked files."
+  ],
+  "manifest_kind": "OPERATOR_TEMPLATE_NOT_GENERATED_SEED_MANIFEST",
+  "seed_manifest_do_not_edit": "run-manifest.json"
+}

@@ -14,6 +14,7 @@ from .validators import DepartmentUsernameValidator
 class User(AbstractUser):
     """Account for staff and students using Django authentication and permissions."""
 
+    must_change_password = models.BooleanField(default=False)
     username_validator = DepartmentUsernameValidator()
     username = models.CharField(
         _("username"), max_length=150, unique=True,
@@ -150,4 +151,42 @@ class AccountAdministrationAudit(models.Model):
 
     class Meta:
         ordering = ["-created_at", "-id"]
+        default_permissions = ()
+
+
+class HODHandover(models.Model):
+    sender = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name='offered_handovers')
+    recipient = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name='incoming_handovers')
+    state = models.CharField(max_length=12, default='pending')
+    created_at = models.DateTimeField(auto_now_add=True)
+    accepted_at = models.DateTimeField(null=True)
+
+    class Meta:
+        default_permissions = ()
+
+class StudentChangeRequest(models.Model):
+    student = models.ForeignKey('students.Student', on_delete=models.PROTECT, related_name='change_requests')
+    kind = models.CharField(max_length=15)
+    values = models.JSONField()
+    baseline = models.JSONField(default=dict)
+    reason = models.CharField(max_length=1000)
+    state = models.CharField(max_length=12, default='pending')
+    created_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name='student_requests')
+    reviewed_by = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, on_delete=models.PROTECT, related_name='student_reviews')
+    reviewed_at = models.DateTimeField(null=True)
+    review_reason = models.CharField(max_length=1000, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        default_permissions = ()
+
+class SourcePerformanceReview(models.Model):
+    source = models.ForeignKey('record_imports.SourcePerformance', on_delete=models.PROTECT, related_name='reviews')
+    actor = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT)
+    reason = models.CharField(max_length=1000)
+    notified_hod = models.BooleanField(default=False)
+    notification_state = models.CharField(max_length=12, default='pending')
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
         default_permissions = ()

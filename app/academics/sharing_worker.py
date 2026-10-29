@@ -6,6 +6,7 @@ from django.utils import timezone
 from students.models import Student
 from .models import ResultShareDelivery
 from .sharing import build_preview
+from .sharing_pdf import uses_pdf
 from .sharing_transport import (RejectedSubmission, UncertainSubmission,
     validate_transport, submit_email, submit_whatsapp)
 
@@ -33,7 +34,8 @@ def process_next(*, channel=None):
         if delivery.status != "processing":
             return False
         batch = delivery.batch
-        current, _ = build_preview([student], batch.academic_session, batch.semester, batch.channels)
+        current, _ = build_preview([student], batch.academic_session, batch.semester, batch.channels,
+            include_pdf=uses_pdf(batch.preview), is_revised=batch.is_revised)
         original = next(row for row in batch.preview if row["student_id"] == str(student.pk))
         if current[0] != original:
             delivery.status, delivery.diagnostic_code = "cancelled", "reviewed_data_changed"

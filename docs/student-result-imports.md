@@ -81,8 +81,11 @@ It recognizes supported headers from content rather than assuming that every
 file ending in `.csv` uses the result-import schema. The nested student export
 contains course lists inside cells; preparation expands these into one result
 per row. Raw table exports retain the converter's two-row master-sheet layout.
-Unsupported layouts, scanned PDFs requiring OCR and XLSX files need a separate
-reviewed conversion; choosing a file in the browser does not establish support.
+Only the defined two-row master marks-sheet layout is supported; other departments
+are compatible only when columns/order/course blocks match. pdfplumber reads
+embedded text/tables, with no OCR. Image-only PDFs need external OCR; scanned PDFs
+with an existing text layer can work if extraction/layout quality is sufficient.
+Unsupported layouts and XLSX files need a separate reviewed conversion; choosing a file in the browser does not establish support.
 
 Preparation makes no database changes. It reports unresolved marks, including
 undecided `NG` entries, separately and never substitutes zero. Literal zero marks
@@ -120,11 +123,14 @@ most 2 MiB; conversion is limited to 1000 source course rows, and PDFs to 20 pag
 PDF parsing runs in a separate process with a 25-second timeout. Preparation
 checks active result-import access before extraction and makes no database writes.
 
-Only the normalized CSV is submitted to the preview endpoint. Saved imports
-retain that CSV and its hash; they do not archive the original PDF/converter
-export or its extraction reports. Keep those private alongside the conversion
-report if source reconciliation is required. No schema migration is needed for
-the preparation endpoint.
+The portal submits normalized CSV plus the returned source_context to preview.
+The context contains format, source_sha256, csv_sha256 and records with all defined
+converter fields. Saved imports retain this evidence and bind it to the exact CSV
+hash, student identifiers and periods. They do not archive the original PDF or
+converter file; keep it private for source reconciliation. Context supplied through
+HTTP is evidence submitted by an authorized reviewer, not an authenticated source
+document or proof that the source itself is correct. Older batches cannot recover
+reported figures already discarded by earlier preparation versions.
 
 Preview body:
 
@@ -173,3 +179,55 @@ and `record_imports.0001_initial`. The identity migration preserves existing
 UUIDs/display values and refuses ambiguous legacy identifiers without merging
 or deleting students. Back up and stop local writers before migration. See
 [student identity](student-registration.md) and [the laptop guide](local-laptop.md).
+
+## Source-reported averages and discrepancies — 23 October 2026
+
+Preparation now carries current/previous reported GPA, reported CGPA, remarks,
+outstanding-course status, current course raw text/units/grade/score, Used Semester
+Ratio, special elective units, notices and page/table references into source_context.
+The parser still extracts no names, course titles, department, faculty, level or
+other structured biodata. Missing reported averages remain missing. F and NG are
+not interchangeable, and NG/missing marks cannot become accepted scores.
+
+Preview accepts optional source_context for results; canonical seven-column CSVs
+without it retain their existing contract and cannot invent reported figures.
+The context and exact CSV hash are part of request-id identity. Changing either
+requires a new request. Preview/refresh/detail/commit return source_performance,
+including per-student source period, source evidence and comparison. A valid
+import can commit with an unresolved GPA/CGPA discrepancy; all score/identity,
+correction approval, scope and stale-review safeguards remain in force.
+
+SourcePerformance records preserve immutable source evidence and the import-time
+comparison in the same transaction/receipt as results. Committed retries create no
+additional observations. review_status stays unresolved; no resolution/edit API is
+introduced. A later numerical match does not resolve the saved discrepancy.
+
+The interim comparison convention is two decimal places, ROUND_HALF_UP and zero
+tolerance, exposed as two_decimal_half_up_zero_tolerance_v1. This is a documented
+implementation choice pending institutional precision/tolerance decisions. Each
+metric exposes reported, calculated, signed calculated-minus-rounded-reported
+difference and status (matching, different, not_reported, not_comparable). The
+original reported decimal remains available. Previous reported GPA is a separate
+field and is not compared without a known previous-period binding.
+
+Calculations reuse academics.calculate_weighted_average and saved units/grading
+versions, including repeated/failed attempts. Preview projections are explicitly
+provisional: they do not verify database results. Live website comparisons require
+verified recorded results and use the corresponding period for GPA and all
+attempts through that period for CGPA, excluding future periods. Missing or
+unverified inputs produce not_comparable. History completeness is not established
+by this source; numeric differences remain review evidence, not proof of error.
+
+The existing scoped staff and own-student GPA/CGPA endpoints now also return
+source_reports. They expose source figures, provenance, live comparison,
+comparison_at_import and unresolved review state. Existing gpa/cgpa values remain
+system-calculated. The portal emphasizes those values and shows discrepancy/source
+details; pending source reports do not replace calculation or verification rules.
+No source observation triggers guardian delivery or changes grading policy.
+
+Migration record_imports.0002_importbatch_source_context_sourceperformance is
+required before deploying this code. It has only been applied in disposable tests;
+no shared/Aiven database was migrated. Follow the existing backup/update procedure.
+Resolution authority/states, source correction, final tolerance/precision and
+complete-history comparability remain open policy work. No automatic GPA-based
+blocking or extraction-confidence threshold was added.

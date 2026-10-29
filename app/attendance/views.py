@@ -1,3 +1,4 @@
+from django.db.models import F
 from django.contrib.auth import get_user_model
 from django.shortcuts import get_object_or_404
 from rest_framework import permissions, serializers, status
@@ -104,6 +105,18 @@ class RosterView(StaffView):
 class AssignmentView(StaffView):
     permission_classes = [IsActiveHOD]
 
+    # Show existing active and inactive assignments without exposing private staff details.
+    def get(self, request, offering_id):
+        offering = get_object_or_404(CourseOffering, pk=offering_id)
+        rows = CourseStaffAssignment.objects.filter(offering=offering).select_related("staff").order_by("staff__username", "pk")
+        paginator = ResultPagination()
+        page = paginator.paginate_queryset(rows, request)
+        return paginator.get_paginated_response([
+            {"id": row.pk, "staff": row.staff_id, "staff_username": row.staff.username,
+             "staff_name": row.staff.get_full_name(), "staff_is_active": row.staff.is_active,
+             "is_active": row.is_active} for row in page
+        ])
+
     # Apply the validated assignment through the academic service boundary.
     def put(self, request, offering_id):
         serializer = AssignmentSerializer(data=request.data)
@@ -134,7 +147,11 @@ class SessionView(StaffView):
     # Hide sessions outside the caller's visibility scope.
     def get(self, request, session_id):
         session = get_object_or_404(visible_sessions(request.user), pk=session_id)
-        return Response({**SessionSerializer(session).data, "student_ids": session.student_ids})
+        roster = CourseRoster.objects.filter(offering=session.offering).first()
+        fields = ("id", "full_name", "identifier_value")
+        return Response({**SessionSerializer(session).data, "student_ids": session.student_ids,
+            "student_details": list(Student.objects.filter(pk__in=session.student_ids).annotate(id=F("pk")).values(*fields)),
+            "current_roster_students": list(roster.students.annotate(id=F("pk")).values(*fields)) if roster else []})
 
 
 # Close a visible session through the audited service workflow.

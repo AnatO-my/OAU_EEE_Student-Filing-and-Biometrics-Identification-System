@@ -8,6 +8,7 @@ from rest_framework.views import APIView
 from rest_framework.pagination import PageNumberPagination
 
 from students.models import Student
+from record_imports.performance import source_reports
 
 from .calculations import calculate_student_cgpa, calculate_student_gpa
 from .models import AcademicSession, Course, CourseOffering, GradingScale, Result, CourseRequirement, GraduationReview
@@ -202,6 +203,7 @@ class StudentGPAView(APIView):
                 "academic_session": academic_session.name,
                 "semester": semester,
                 "gpa": str(gpa) if gpa is not None else None,
+                "source_reports": source_reports(student, academic_session, semester),
             }
         )
 
@@ -230,6 +232,7 @@ class StudentCGPAView(APIView):
             "student_id": str(student.pk),
             "cgpa": str(cgpa) if cgpa is not None else None,
             "history_completeness": completeness,
+            "source_reports": source_reports(student),
         })
 
 

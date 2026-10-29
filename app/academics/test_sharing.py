@@ -187,6 +187,17 @@ class ResultSharingTests(APITestCase):
         messages = {m.to[0]: m.body for m in mail.outbox}
         self.assertNotIn("Other Student", messages[self.guardian.email])
         self.assertNotIn("Example Student", messages[guardian.email])
+        # Check attached documents as well as envelope/body isolation.
+        import pdfplumber
+        for message in mail.outbox:
+            with pdfplumber.open(io.BytesIO(message.attachments[0][1])) as pdf:
+                statement = "\n".join(page.extract_text() or "" for page in pdf.pages)
+            if message.to == [self.guardian.email]:
+                self.assertIn(self.student.full_name, statement)
+                self.assertNotIn("Other Student", statement)
+            else:
+                self.assertIn("Other Student", statement)
+                self.assertNotIn(self.student.full_name, statement)
 
     # Reject a queued preview if academic results or guardian contact data changed.
     def test_stale_preview_rejects_result_and_contact_changes(self):

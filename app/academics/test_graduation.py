@@ -43,6 +43,10 @@ class GraduationWorkflowTests(APITestCase):
 
     # Require review before graduation and preserve the student's existing profile state.
     def test_exactly_one_qualifies_after_hod_review(self):
+        from django.contrib.auth import get_user_model
+        account = get_user_model().objects.create_user("synthetic-graduate-login", password="Synthetic!Graduate7295")
+        self.student.user = account
+        self.student.save(update_fields=["user"])
         self.prepare()
         self.assertEqual(self.graduate().status_code, 400)
         self.assertEqual(self.approve().status_code, 200)
@@ -50,7 +54,11 @@ class GraduationWorkflowTests(APITestCase):
         self.student.refresh_from_db()
         self.assertEqual(self.student.academic_status, "graduated")
         self.assertEqual(self.student.current_level, 300)
-        self.assertTrue(self.student.is_active)
+        self.assertFalse(self.student.is_active)
+        account.refresh_from_db()
+        self.assertFalse(account.is_active)
+        self.assertTrue(Student.objects.filter(pk=self.student.pk).exists())
+        self.assertTrue(self.student.results.exists())
 
     # Keep a CGPA just below the threshold ineligible rather than rounding it upward.
     def test_point_995_never_rounds_into_eligibility(self):

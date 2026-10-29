@@ -137,6 +137,8 @@ def parse_outstanding_courses(text):
 
 def reported_gpa(value):
     value = value.strip()
+    if not value:
+        return None
     if not re.fullmatch(r"\d+(?:\.\d+)?", value):
         raise ValueError(f"Invalid reported GPA: {value!r}.")
     return float(value)
@@ -236,7 +238,7 @@ def export_student_results(tables_csv, extra_text_file, output_folder=None):
             for field in ("current_courses", "outstanding_courses", "notices"):
                 flat[field] = json.dumps(student[field], ensure_ascii=False)
             for field in ("current_gpa", "previous_gpa", "cgpa"):
-                flat[field] = f"{student[field]:.2f}"
+                flat[field] = "" if student[field] is None else f"{student[field]:.2f}"
             writer.writerow(flat)
 
     notice_count = sum(len(student["notices"]) for student in students)

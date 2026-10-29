@@ -92,7 +92,7 @@ export async function apiRequest(
   const started = sessionEpoch;
   const verb = method.toUpperCase();
   const headers = {
-    Accept: responseType === "blob" ? "text/csv" : "application/json",
+    Accept: responseType === "blob" ? "*/*" : "application/json",
     ...extraHeaders,
   };
   const isWrite = !["GET", "HEAD", "OPTIONS"].includes(verb);

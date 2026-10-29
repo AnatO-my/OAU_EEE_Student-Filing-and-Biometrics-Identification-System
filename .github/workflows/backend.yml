@@ -32,6 +32,6 @@ jobs:
       - run: python -m pip install -r requirements.txt
       - run: python manage.py check
       - run: python manage.py makemigrations --check --dry-run
-      - run: python manage.py test students accounts academics attendance record_imports documents
+      - run: python manage.py test students accounts academics attendance record_imports documents teaching
       - run: python tools/test_export_mark_sheet_csv.py
       - run: python -m unittest test_student_results -v

@@ -15,7 +15,7 @@ package-dir = {"" = "app"}
 
 [tool.setuptools.packages.find]
 where = ["app"]
-include = ["accounts*", "academics*", "attendance*", "config*", "students*", "record_imports*", "documents*"]
+include = ["accounts*", "academics*", "attendance*", "config*", "students*", "record_imports*", "documents*", "teaching*"]
 namespaces = false
 
 [tool.setuptools.dynamic]

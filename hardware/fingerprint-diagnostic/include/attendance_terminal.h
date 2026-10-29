@@ -31,9 +31,9 @@ template <class Hardware> class AttendanceTerminal {
   DateTime time_, edit_;
   Screen screen_;
 
-  void line(unsigned row,const char *text) { snprintf(screen_.line[row],22,"%s",text); }
+  void line(unsigned row,const char *text) { snprintf(screen_.line[row],sizeof(screen_.line[row]),"%s",text); }
   void draw(const char *title,const char *detail,const char *footer="MENU=CANCEL") {
-    screen_=Screen(); line(0,title); line(2,detail); line(7,footer); hw_.show(screen_);
+    screen_=Screen(); line(0,title); line(2,detail); line(SCREEN_FOOTER,footer); hw_.show(screen_);
     Serial.printf("UI: %s | %s | %s\n",title,detail,footer);
   }
   void suppress() { for (auto &key:keys_) key.suppress(); }
@@ -308,79 +308,89 @@ template <class Hardware> class AttendanceTerminal {
     const uint8_t limit=daysIn(edit_.year,edit_.month); if (edit_.day>limit) edit_.day=limit;
     stateAt_=activity_=repeatAt_=millis(); clockScreen();
   }
+  const char *readiness() const {
+    if (!authenticated) return "CHECK SENSOR WIRING";
+    if (countsOK_ && !stored_) return "ENROLL A FINGER";
+    if (!countsOK_) return "CHECK SCANNER STATUS";
+    if (!clockOK_) return "SET CLOCK TO RECORD";
+    if (!todayOK_) return "CHECK LOG STORAGE";
+    return "READY FOR ATTENDANCE";
+  }
   void pageScreen(bool announce=false) {
     screen_=Screen();
     const char *titles[]={"ATTENDANCE","STATISTICS","EXPORT LOG","SET CLOCK","SYSTEM","ERASE FINGERPRINTS",
       "ATTENDANCE MODE","START / STOP","DEFERRED CLASS BATCH"};
     line(0,titles[page_]);
     char text[40];
-    if (page_==0 || page_==1) {
+    if (page_==0) {
+      // Home fits six lines. Template totals remain available on Statistics.
+      line(1,mustLift_?"Lift finger first":"Place finger");
       if (clockOK_) { stamp(time_,text,sizeof(text)); line(2,text); }
       else line(2,"RTC UNSET / ABSENT");
-      if (page_==0) line(3,mustLift_?"Lift finger first":"Place finger");
-      if (countsOK_) snprintf(text,sizeof(text),"Templates: %u/%u",stored_,capacity_);
-      else snprintf(text,sizeof(text),"%s",authenticated?"Counts unavailable":"Sensor unavailable");
-      line(4,text);
+      line(3,readiness());
       if (todayOK_) snprintf(text,sizeof(text),"Today records: %lu",static_cast<unsigned long>(today_));
       else snprintf(text,sizeof(text),"Local log unavailable");
-      line(5,text); line(7,page_==0?"ENR DEL MENU":"MENU=NEXT");
-      if (page_==0) {
-        if (!authenticated) line(6,"CHECK SENSOR WIRING");
-        else if (countsOK_ && !stored_) line(6,"ENROLL A FINGER");
-        else if (!countsOK_) line(6,"CHECK SCANNER STATUS");
-        else if (!clockOK_) line(6,"SET CLOCK TO RECORD");
-        else if (!todayOK_) line(6,"CHECK LOG STORAGE");
-        else line(6,"READY FOR ATTENDANCE");
-        if(capture_) {
-          line(0,mode_==AttendanceMode::Immediate?"IMMEDIATE ATTENDANCE":"DEFERRED CAPTURE");
-          line(1,running_?"RUNNING":"STOPPED: MENU > START");
-          if(mode_==AttendanceMode::Deferred) {
-            snprintf(text,sizeof(text),"Saved: %u PENDING",capture_->savedCount()); line(4,text);
-            line(3,"Lift between scans"); line(5,"No identity decision");
-            line(6,capture_->prepared()?"Class batch prepared":"PREPARE CLASS VIA USB");
-          }
+      line(4,text); line(SCREEN_FOOTER,"ENR DEL MENU");
+      if(capture_) {
+        line(0,mode_==AttendanceMode::Immediate?"IMMEDIATE ATTENDANCE":"DEFERRED CAPTURE");
+        line(1,running_?(mustLift_?"RUN: LIFT FINGER":"RUN: PLACE FINGER"):"STOPPED: MENU > START");
+        if(mode_==AttendanceMode::Deferred) {
+          if(running_) line(1,"RUNNING: LIFT FINGER");
+          snprintf(text,sizeof(text),"Saved: %u PENDING",capture_->savedCount()); line(2,text);
+          line(3,"No identity decision");
+          line(4,capture_->prepared()?"Class batch prepared":"PREPARE CLASS VIA USB");
         }
       }
+    } else if (page_==1) {
       if(capture_ && mode_==AttendanceMode::Deferred) {
-        line(0,page_==0?"DEFERRED CAPTURE":"DEFERRED STATISTICS");
-        line(2,"Time: boot-relative"); line(3,"Lift between scans");
-        snprintf(text,sizeof(text),"Captures: %u PENDING",capture_->savedCount()); line(4,text);
-        line(5,"Not a presence count");
-        line(6,capture_->prepared()?"Class batch prepared":"PREPARE CLASS VIA USB");
+        line(0,"DEFERRED STATISTICS"); line(1,"Time: boot-relative");
+        snprintf(text,sizeof(text),"Captures: %u PENDING",capture_->savedCount()); line(2,text);
+        line(3,"Not a presence count");
+        line(4,capture_->prepared()?"Class batch prepared":"PREPARE CLASS VIA USB");
+      } else {
+        if(clockOK_) { stamp(time_,text,sizeof(text)); line(1,text); }
+        else line(1,"RTC UNSET / ABSENT");
+        if(countsOK_) snprintf(text,sizeof(text),"Templates: %u/%u",stored_,capacity_);
+        else snprintf(text,sizeof(text),"%s",authenticated?"Counts unavailable":"Sensor unavailable");
+        line(2,text);
+        if(todayOK_) snprintf(text,sizeof(text),"Today records: %lu",static_cast<unsigned long>(today_));
+        else snprintf(text,sizeof(text),"Local log unavailable");
+        line(3,text); line(4,readiness());
       }
+      line(SCREEN_FOOTER,"MENU=NEXT");
     } else if (page_==2) {
       if(capture_ && mode_==AttendanceMode::Deferred) {
         line(0,"DEFERRED EXPORT"); line(2,"Download batch via USB");
-        line(4,"Device files retained");
-        line(6,capture_->wirelessAvailable()?"DEL: SEND VIA WI-FI":"USB downloader needed");
-        line(7,"ENR=HELP MENU=NEXT");
+        line(3,"Device files retained");
+        line(4,capture_->wirelessAvailable()?"DEL: SEND VIA WI-FI":"USB downloader needed");
+        line(SCREEN_FOOTER,"ENR=HELP MENU=NEXT");
       } else { line(2,"Print CSV over USB");
-        if(capture_ && capture_->wirelessAvailable()) line(6,"DEL: CSV VIA WI-FI");
-        line(7,"ENR=EXPORT MENU>NEXT"); }
+        if(capture_ && capture_->wirelessAvailable()) line(4,"DEL: CSV VIA WI-FI");
+        line(SCREEN_FOOTER,"ENR=EXPORT MENU>NEXT"); }
     }
-    else if (page_==3) { line(2,"No automatic default"); line(7,"ENR=SET MENU>NEXT"); }
+    else if (page_==3) { line(2,"No automatic default"); line(SCREEN_FOOTER,"ENR=SET MENU>NEXT"); }
     else if (page_==4) {
-      snprintf(text,sizeof(text),"UART: %lu",static_cast<unsigned long>(connectedBaud)); line(2,text);
-      snprintf(text,sizeof(text),"RTC:%s OLED:%s",clockOK_?"OK":"ERR",hw_.oledOK?"OK":"OFF"); line(4,text);
-      line(5,hw_.fsOK?"LittleFS mounted":"LittleFS unavailable"); line(7,"MENU=NEXT");
-    } else if(page_==5) { line(2,"HOLD DELETE FOR 3S"); line(4,"Check-in logs kept"); line(7,"MENU=HOME"); }
+      snprintf(text,sizeof(text),"UART: %lu",static_cast<unsigned long>(connectedBaud)); line(1,text);
+      snprintf(text,sizeof(text),"RTC:%s OLED:%s",clockOK_?"OK":"ERR",hw_.oledOK?"OK":"OFF"); line(2,text);
+      line(3,hw_.fsOK?"LittleFS mounted":"LittleFS unavailable"); line(SCREEN_FOOTER,"MENU=NEXT");
+    } else if(page_==5) { line(2,"HOLD DELETE FOR 3S"); line(4,"Check-in logs kept"); line(SCREEN_FOOTER,"MENU=HOME"); }
     else if(page_==6) {
       line(2,"ENR: IMMEDIATE"); line(3,"DEL: DEFERRED");
-      line(5,"Confirm before start"); line(7,"MENU=NEXT");
+      line(4,"Confirm before start"); line(SCREEN_FOOTER,"MENU=NEXT");
     } else if(page_==7) {
       line(2,running_?"ENR: STOP ATTENDANCE":"ENR: START ATTENDANCE");
-      line(4,mode_==AttendanceMode::Immediate?"Mode: IMMEDIATE":"Mode: DEFERRED"); line(7,"MENU=NEXT");
+      line(4,mode_==AttendanceMode::Immediate?"Mode: IMMEDIATE":"Mode: DEFERRED"); line(SCREEN_FOOTER,"MENU=NEXT");
     } else {
       line(1,"ENR: NEXT SAVED BATCH");
       if(capture_ && capture_->prepared()) {
-        const char *id=capture_->classId(); line(2,"CLASS SESSION UUID");
-        snprintf(text,sizeof(text),"%.18s",id); line(3,text);
-        line(4,id+18); snprintf(text,sizeof(text),"Saved captures: %u",capture_->savedCount()); line(5,text);
+        const char *id=capture_->classId(); line(0,"CLASS SESSION UUID");
+        snprintf(text,sizeof(text),"%.18s",id); line(2,text);
+        line(3,id+18); snprintf(text,sizeof(text),"Saved captures: %u",capture_->savedCount()); line(4,text);
       } else line(3,"PREPARE CLASS VIA USB");
-      line(7,"MENU=HOME");
+      line(SCREEN_FOOTER,"MENU=HOME");
     }
     hw_.show(screen_);
-    if (announce) Serial.printf("UI: %s | %s | %s\n",screen_.line[0],screen_.line[2],screen_.line[7]);
+    if (announce) Serial.printf("UI: %s | %s | %s\n",screen_.line[0],screen_.line[2],screen_.line[SCREEN_FOOTER]);
   }
   void reconnect() {
     if (millis()-retryAt_<5000) return;
@@ -421,7 +431,7 @@ public:
     paused_=true; state_=State::Idle; mustLift_=true; countsOK_=false; suppress(); hw_.off();
     Screen pausedScreen; snprintf(pausedScreen.line[0],22,"ATTENDANCE PAUSED");
     snprintf(pausedScreen.line[2],22,"Serial maintenance");
-    snprintf(pausedScreen.line[7],22,"%s",capture_?"HOLD MENU 2S: MODES":"SEND A TO RESUME"); hw_.show(pausedScreen);
+    snprintf(pausedScreen.line[SCREEN_FOOTER],22,"%s",capture_?"HOLD MENU 2S: MODES":"SEND A TO RESUME"); hw_.show(pausedScreen);
   }
   void resume() {
     paused_=false; state_=State::Idle; page_=0; mustLift_=true; suppress(); refresh();

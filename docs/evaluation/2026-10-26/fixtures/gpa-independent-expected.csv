@@ -1,0 +1,4 @@
+case_id,student_handle,stage,semester_units,semester_quality_points,gpa_exact_fraction,gpa_2dp,cumulative_units,cumulative_quality_points,cgpa_exact_fraction,cgpa_2dp
+GPA-02,EVAL-STUDENT-A and EVAL-STUDENT-B,baseline verified,11,37,37/11,3.36,19,60,60/19,3.16
+GPA-03,EVAL-STUDENT-B,after verified repeated attempt,14,52,52/14,3.71,22,75,75/22,3.41
+GPA-05,EVAL-STUDENT-A,after verified score correction,11,42,42/11,3.82,19,65,65/19,3.42

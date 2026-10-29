@@ -73,9 +73,23 @@ def validate_transport(channel):
 
 # Send one email and distinguish explicit rejection from an ambiguous transport failure.
 def submit_email(delivery):
+    from .sharing_pdf import snapshot_bytes
+    item = next(row for row in delivery.batch.preview
+                if row["student_id"] == str(delivery.student_id))
+    snapshot = (item.get("report") or {}).get("pdf")
+    body = delivery.body
+    if snapshot:
+        body = (f"Please find attached the reviewed semester result statement for "
+                f"{item['name']} ({item['identifier']}).\n\n"
+                "This summary covers verified recorded results and is not an official transcript. "
+                "Please contact the department about discrepancies.")
+    message = EmailMessage(delivery.subject, body, settings.DEFAULT_FROM_EMAIL,
+        [delivery.destination], headers={"Message-ID": f"<result-share-{delivery.pk}@student-records.invalid>"})
+    if snapshot:
+        # Validate the saved reviewed bytes before any network I/O.
+        message.attach(snapshot["filename"], snapshot_bytes(snapshot), "application/pdf")
     try:
-        count = EmailMessage(delivery.subject, delivery.body, settings.DEFAULT_FROM_EMAIL,
-            [delivery.destination], headers={"Message-ID": f"<result-share-{delivery.pk}@student-records.invalid>"}).send()
+        count = message.send()
         if count != 1:
             raise RejectedSubmission()
     except (smtplib.SMTPRecipientsRefused, smtplib.SMTPSenderRefused,

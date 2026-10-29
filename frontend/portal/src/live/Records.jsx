@@ -1,3 +1,4 @@
+import SourceComparisons from './SourceComparisons';
 import { useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import * as api from '../api';
@@ -111,7 +112,7 @@ function MyAverage() {
   }
   return <details><summary>Calculate my GPA and CGPA</summary><Alert>{error}</Alert><form className="live-filters" onSubmit={submit}>
     <label>Academic session<input name="session" pattern="[0-9]{4}/[0-9]{4}" placeholder="2025/2026" required disabled={busy} /></label><label>Semester<select name="semester" disabled={busy}><option value="harmattan">Harmattan</option><option value="rain">Rain</option></select></label>
-    <button disabled={busy}>Calculate averages</button></form>{data && <p role="status">GPA: {data.gpa.gpa ?? 'No results'} · CGPA: {data.cgpa.cgpa ?? 'No results'} · History: {data.cgpa.history_completeness.replaceAll('_', ' ')}</p>}</details>;
+    <button disabled={busy}>Calculate averages</button></form>{data && <><p role="status"><strong>System-calculated GPA: {data.gpa.gpa ?? 'No results'} | System-calculated CGPA: {data.cgpa.cgpa ?? 'No results'}</strong> | History: {data.cgpa.history_completeness.replaceAll('_', ' ')}</p><SourceComparisons reports={data.cgpa.source_reports || data.gpa.source_reports} /></>}</details>;
 }
 
 function Results({ user }) {

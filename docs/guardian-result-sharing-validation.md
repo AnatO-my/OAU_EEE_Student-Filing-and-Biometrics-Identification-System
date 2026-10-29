@@ -45,3 +45,19 @@ described by deploy/result-email-worker.env.example. These are prepared template
 no service/scheduled task has been installed or activated. Use the same PostgreSQL
 database and provider settings for the API and worker. See the React README for
 local startup, the HOD workflow and production merge instructions.
+
+
+## PDF result attachments - 23 October 2026
+
+The focused sharing and PDF suite passes 39 tests using the in-memory test database
+and locmem email backend. Coverage includes exact preview/attachment bytes and hash,
+determinism, non-HOD denial, missing batch-student denial, no-store responses,
+per-student attachment isolation, legacy plain-email compatibility, multi-page table
+headers/wrapping and safe filenames. Existing stale-preview, manual retry, unknown
+submission and duplicate-send tests remain passing. Guardian frontend: 14 tests pass,
+including opening the saved PDF while confirmation is still required.
+
+The renderer was exercised with synthetic records and the resulting PDF visually
+inspected. No actual guardian email was sent, no real student data accessed and no
+live/shared database changed. These checks do not replace provider delivery checks
+or PostgreSQL concurrency validation before deployment.

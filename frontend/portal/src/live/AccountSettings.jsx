@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import * as api from '../api';
 import { useAuth } from '../auth/useAuth';
@@ -68,7 +68,7 @@ function DepartmentSettings({ user, onTransferOutcome }) {
     <section className="live-card" id="account-advisers"><h2>Part-adviser assignments</h2><p>Assign or reassign an academic level for a recorded session. Deactivating an assignment removes that adviser scope.</p>
       <RemoteState resource={options}>{(configuration) => <RemoteState resource={staffChoices}>{(staff) => <AdviserSettings configuration={configuration} staff={staff} />}</RemoteState>}</RemoteState>
     </section>
-    <section className="live-card" id="account-hod-transfer"><h2>Transfer HOD responsibility</h2><p>Select an existing active staff account. The selected person gains HOD access and your account returns to ordinary staff access.</p>
+    <section className="live-card" id="account-hod-transfer"><h2>Transfer HOD responsibility</h2><p>Select an existing active staff account. The selected person must accept the offer in Documents and requests before HOD access changes.</p>
       <RemoteState resource={staffChoices}>{(staff) => <HodTransfer user={user} staff={staff} onTransferOutcome={onTransferOutcome} />}</RemoteState>
     </section>
   </>;
@@ -165,23 +165,23 @@ function AdviserEditor({ assignment, configuration, staff, onSaved, onCancel }) 
 }
 
 function HodTransfer({ user, staff, onTransferOutcome }) {
-  const [targetId, setTargetId] = useState(''), [expected, setExpected] = useState(''), [reviewed, setReviewed] = useState(false);
-  const [busy, setBusy] = useState(false), [error, setError] = useState('');
-  const password = useRef(null);
+  const [targetId, setTargetId] = useState(''), [expected, setExpected] = useState('');
+  const [reviewed, setReviewed] = useState(false), [busy, setBusy] = useState(false);
+  const [error, setError] = useState(''), [notice, setNotice] = useState('');
   const targets = staff.filter((member) => member.can_transfer && member.is_active && !member.is_hod && member.id !== user.id);
   const target = targets.find((member) => String(member.id) === targetId);
-  const ready = target && expected === target.username && reviewed && !busy;
-  function chooseTarget(event) { setTargetId(event.target.value); setExpected(''); setReviewed(false); setError(''); if (password.current) password.current.value = ''; }
+  const ready = target && expected === target.username && reviewed && !busy && !notice;
+  function chooseTarget(event) {
+    setTargetId(event.target.value); setExpected(''); setReviewed(false); setError(''); setNotice('');
+  }
   async function submit(event) {
     event.preventDefault(); if (!ready) return;
-    const values = new FormData(event.currentTarget);
     setBusy(true); setError('');
     try {
-      await api.transferHod({ current_password: values.get('current_password'), target_staff_id: target.id, expected_target_username: expected, confirmation: 'TRANSFER HOD' });
-      if (password.current) password.current.value = '';
-      await onTransferOutcome(true);
+      await api.apiRequest('/api/workflows/handover/', { method: 'POST', body: { target_id: target.id } });
+      setNotice('Handover offered. Your HOD access remains until the incoming staff member accepts in Documents and requests.');
+      setReviewed(false);
     } catch (err) {
-      if (password.current) password.current.value = '';
       if (err.status === 0 || err.status >= 500 || err.status === 403) await onTransferOutcome(false);
       else { setError(err.message); setReviewed(false); }
     } finally { setBusy(false); }
@@ -190,13 +190,12 @@ function HodTransfer({ user, staff, onTransferOutcome }) {
     {!targets.length ? <Empty>No eligible active staff member is available. Create or activate a staff account first.</Empty> : <form className="live-form" onSubmit={submit}>
       <label>New HOD<select value={targetId} onChange={chooseTarget} disabled={busy} required><option value="">Choose an existing staff member</option>{targets.map((member) => <option key={member.id} value={member.id}>{staffLabel(member)}</option>)}</select></label>
       {target && <>
-        <p className="live-notice">{staffLabel(target)} will gain HOD access. {user.username} will lose HOD access and remain an active staff member. Review adviser assignments separately.</p>
+        <p className="live-notice">{staffLabel(target)} will be offered HOD responsibility. Your access changes only after their acceptance. Adviser assignments remain separate.</p>
         <label>Type the new HOD’s username<input value={expected} onChange={(event) => { setExpected(event.target.value); setReviewed(false); }} autoComplete="off" required disabled={busy} /></label>
-        <label>Confirm your current password<input ref={password} name="current_password" type="password" autoComplete="current-password" required disabled={busy} /></label>
-        <label className="live-check"><input type="checkbox" checked={reviewed} onChange={(event) => setReviewed(event.target.checked)} disabled={busy} />I reviewed the selected staff member and understand that my HOD access will end.</label>
-        <button className="live-primary" disabled={!ready}>{busy ? 'Transferring…' : 'Transfer HOD responsibility'}</button>
+        <label className="live-check"><input type="checkbox" checked={reviewed} onChange={(event) => setReviewed(event.target.checked)} disabled={busy} />I reviewed the selected staff member and understand that access changes only after acceptance.</label>
+        <button className="live-primary" disabled={!ready}>{busy ? 'Offering handover…' : 'Offer HOD handover'}</button>
       </>}
     </form>}
-    <Alert>{error}</Alert>
+    <Alert>{error}</Alert>{notice && <p role="status">{notice}</p>}
   </>;
 }

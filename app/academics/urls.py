@@ -94,3 +94,8 @@ urlpatterns += [path("result-shares/", ResultShareListView.as_view(), name="resu
 
 from .current_session_views import CurrentSessionView
 urlpatterns += [path("academic-sessions/current/", CurrentSessionView.as_view(), name="current-academic-session")]
+
+
+from .sharing_views import ResultSharePDFView
+urlpatterns += [path("result-shares/<uuid:batch_id>/students/<uuid:student_id>/report.pdf",
+    ResultSharePDFView.as_view(), name="result-share-pdf")]

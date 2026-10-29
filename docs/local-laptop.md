@@ -1,5 +1,9 @@
 # Run the integrated application on this laptop
 
+For copy-and-paste PowerShell commands by scenario (normal startup, updates,
+email, alternate ports, separate servers, standalone guardians and offline fake
+data), see [the website startup command guide](../START-WEBSITE-POWERSHELL.md).
+
 The React portal, Django API/admin and optional email worker run on this laptop.
 The selected application database remains **Aiven PostgreSQL**, so database use
 requires internet access. Hosting is deferred. The disposable local PostgreSQL
@@ -49,7 +53,7 @@ updates the frontend proxy and trusted origin together.
 Stop the local startup terminal with Ctrl+C. In the configured Aiven terminal,
 run `./scripts/update-local.ps1`. This checks the connection, shows the migration
 plan, creates a timestamped private backup, proves its restoration in a new local
-cluster, applies the two registration/import migrations, verifies the database
+cluster, applies all pending application migrations, verifies the database
 and starts the application. It imports no student records or results. Credentials
 stay in the terminal environment. See [student registration](student-registration.md)
 and [reviewed imports](student-result-imports.md).
@@ -188,3 +192,7 @@ See [frontend integration](frontend-integration-checkpoint.md),
   grading, profile/account administration and some lifecycle operations remain
   in Django admin. Timetables, appointments, document-upload pages and biometric
   identity matching are outside this frontend integration.
+
+## 26 October application update checkpoint
+
+The accumulated student, account, attendance, document, result-import, guardian-report and teaching migrations were applied to Aiven using the backed-up update workflow. Database readiness and the portal login passed after startup; both frontend builds passed. The application runs at http://127.0.0.1:5175/login while the interactive update terminal stays open. The email worker was not started. Normal later restarts use `scripts/start-local.ps1` in the configured terminal; future pending migrations use `scripts/update-local.ps1`. The detailed checkpoint is in `docs/evaluation/2026-10-26/application-update-checkpoint.json`.

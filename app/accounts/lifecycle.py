@@ -60,7 +60,8 @@ def confirm_password_reset(*, uid, token, new_password):
         raise ValidationError("The reset link is invalid or expired.")
     validate_password(new_password, user)
     user.set_password(new_password)
-    user.save(update_fields=["password"])
+    user.must_change_password = False
+    user.save(update_fields=["password", "must_change_password"])
     return user
 
 
@@ -72,7 +73,8 @@ def change_password(*, user, current_password, new_password):
         raise ValidationError({"current_password": "The current password is incorrect."})
     validate_password(new_password, user)
     user.set_password(new_password)
-    user.save(update_fields=["password"])
+    user.must_change_password = False
+    user.save(update_fields=["password", "must_change_password"])
     return user
 
 
@@ -89,6 +91,7 @@ def provision_student_account(*, user, student, validated_data):
                    is_staff=False, is_superuser=False, is_active=True)
     validate_password(validated_data["password"], account)
     account.set_password(validated_data["password"])
+    account.must_change_password = True
     account.full_clean()
     account.save()
     student.user = account

@@ -43,6 +43,8 @@ class Student(models.Model):
     class AcademicStatus(models.TextChoices):
         UNDERGRADUATE = "undergraduate", "Undergraduate"
         GRADUATED = "graduated", "Graduated"
+        WITHDRAWN = "withdrawn", "Withdrawn"
+        LEFT = "left", "Left department"
 
     # class for identifier type, this is used to identify a student uniquely; utme number is only used as a backup until matriculation number is generated. Matric number is the primary identifier for a student.
     class IdentifierType(models.TextChoices):
@@ -71,6 +73,7 @@ class Student(models.Model):
     )
     identifier_key = models.CharField(max_length=300, unique=True, editable=False)
     full_name = models.CharField(max_length=200)
+    programme = models.CharField(max_length=150, blank=True, default="")
     surname = models.CharField(max_length=100, blank=True, default="")
     # Optional biodata entered explicitly rather than inferred from full_name.
     # It remains write-only in the profile API; login uses a separate account
@@ -118,7 +121,14 @@ class Student(models.Model):
                 stored_identity = Student.objects.using(using).filter(pk=self.pk).values_list("identifier_type", "identifier_value").get()
                 if stored_identity[0] != self.identifier_type or identifier_key(stored_identity[1]) != self.identifier_key:
                     raise ValueError("A partial save cannot reserve an identity that it does not persist. Refresh the student record.")
+            if self.academic_status in {"graduated", "withdrawn", "left"}:
+                self.is_active = False
+                if kwargs.get("update_fields") is not None:
+                    kwargs["update_fields"] = set(kwargs["update_fields"]) | {"is_active"}
             super().save(*args, **kwargs)
+            if not self.is_active and self.user_id:
+                from django.contrib.auth import get_user_model
+                get_user_model().objects.filter(pk=self.user_id).update(is_active=False)
             entry, _ = StudentIdentifier.objects.using(using).get_or_create(
                 identifier_key=self.identifier_key,
                 defaults={"student_id": self.pk, "identifier_type": self.identifier_type,

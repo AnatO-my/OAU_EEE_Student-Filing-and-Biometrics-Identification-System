@@ -5,7 +5,7 @@ import { AuthContext } from '../auth/context';
 import AccountSettings from './AccountSettings';
 import * as api from '../api';
 
-vi.mock('../api', async (original) => ({ ...await original(), changePassword: vi.fn(), getCurrentUser: vi.fn(), getAdministrationOptions: vi.fn(), listManagedStaff: vi.fn(), createManagedStaff: vi.fn(), updateManagedStaff: vi.fn(), listAdviserAssignments: vi.fn(), createAdviserAssignment: vi.fn(), updateAdviserAssignment: vi.fn(), transferHod: vi.fn() }));
+vi.mock('../api', async (original) => ({ ...await original(), changePassword: vi.fn(), getCurrentUser: vi.fn(), getAdministrationOptions: vi.fn(), listManagedStaff: vi.fn(), createManagedStaff: vi.fn(), updateManagedStaff: vi.fn(), listAdviserAssignments: vi.fn(), createAdviserAssignment: vi.fn(), updateAdviserAssignment: vi.fn(), transferHod: vi.fn(), apiRequest: vi.fn() }));
 const hod = { id: 1, username: 'synthetic_hod', role: 'hod', is_staff: true, is_superuser: true };
 const colleague = { id: 2, username: 'synthetic_adviser', first_name: 'Synthetic', last_name: 'Adviser', email: 'adviser@example.test', is_active: true, is_hod: false, can_transfer: true, direct_permissions: ['students.view_student'], inherited_permissions: ['academics.view_result'], groups: ['Student Readers'] };
 const nextStaff = { id: 3, username: 'synthetic_editor', first_name: 'Synthetic', last_name: 'Editor', email: '', is_active: true, is_hod: false, can_transfer: true, direct_permissions: [], inherited_permissions: [], groups: [] };
@@ -19,8 +19,7 @@ async function ready() { await screen.findByRole('button', { name: 'Add staff me
 async function prepareTransfer() {
   await ready(); fireEvent.change(screen.getByLabelText('New HOD'), { target: { value: '2' } });
   fireEvent.change(screen.getByLabelText('Type the new HOD’s username'), { target: { value: 'synthetic_adviser' } });
-  fireEvent.change(screen.getByLabelText('Confirm your current password'), { target: { value: 'synthetic-current-password' } });
-  fireEvent.click(screen.getByLabelText('I reviewed the selected staff member and understand that my HOD access will end.'));
+  fireEvent.click(screen.getByLabelText('I reviewed the selected staff member and understand that access changes only after acceptance.'));
 }
 beforeEach(() => {
   vi.clearAllMocks(); api.getAdministrationOptions.mockResolvedValue(options);
@@ -87,11 +86,11 @@ describe('account settings and department management', () => {
   });
   it('requires the exact selected username and review before any HOD transfer', async () => {
     account(); await ready(); fireEvent.change(screen.getByLabelText('New HOD'), { target: { value: '2' } });
-    const button = screen.getByRole('button', { name: 'Transfer HOD responsibility' }); expect(button.disabled).toBe(true);
-    fireEvent.change(screen.getByLabelText('Type the new HOD’s username'), { target: { value: 'wrong-person' } }); fireEvent.click(screen.getByLabelText('I reviewed the selected staff member and understand that my HOD access will end.')); expect(button.disabled).toBe(true);
+    const button = screen.getByRole('button', { name: 'Offer HOD handover' }); expect(button.disabled).toBe(true);
+    fireEvent.change(screen.getByLabelText('Type the new HOD’s username'), { target: { value: 'wrong-person' } }); fireEvent.click(screen.getByLabelText('I reviewed the selected staff member and understand that access changes only after acceptance.')); expect(button.disabled).toBe(true);
     fireEvent.change(screen.getByLabelText('Type the new HOD’s username'), { target: { value: 'synthetic_adviser' } }); expect(button.disabled).toBe(true);
-    fireEvent.click(screen.getByLabelText('I reviewed the selected staff member and understand that my HOD access will end.')); expect(button.disabled).toBe(false); expect(api.transferHod).not.toHaveBeenCalled();
-    fireEvent.change(screen.getByLabelText('New HOD'), { target: { value: '3' } }); expect(screen.getByLabelText('Type the new HOD’s username').value).toBe(''); expect(screen.getByRole('button', { name: 'Transfer HOD responsibility' }).disabled).toBe(true);
+    fireEvent.click(screen.getByLabelText('I reviewed the selected staff member and understand that access changes only after acceptance.')); expect(button.disabled).toBe(false); expect(api.transferHod).not.toHaveBeenCalled();
+    fireEvent.change(screen.getByLabelText('New HOD'), { target: { value: '3' } }); expect(screen.getByLabelText('Type the new HOD’s username').value).toBe(''); expect(screen.getByRole('button', { name: 'Offer HOD handover' }).disabled).toBe(true);
   });
   it('does not offer inactive, current-HOD or ineligible staff as a transfer target', async () => {
     api.listManagedStaff.mockResolvedValue(page([colleague, { ...nextStaff, id: 3, is_active: false }, { ...nextStaff, id: 4, username: 'linked_student_staff', can_transfer: false }, { ...nextStaff, ...hod, is_hod: true, can_transfer: true }]));
@@ -99,23 +98,30 @@ describe('account settings and department management', () => {
     const choices = within(screen.getByLabelText('New HOD')).getAllByRole('option').map((option) => option.value);
     expect(choices).toEqual(['', '2']); expect(api.transferHod).not.toHaveBeenCalled();
   });
-  it('hides HOD controls immediately after transfer and refreshes the new ordinary staff role', async () => {
-    api.transferHod.mockResolvedValue({ user: { ...hod, role: 'staff', is_superuser: false } }); api.getCurrentUser.mockResolvedValue({ ...hod, role: 'staff', is_superuser: false });
-    const refreshUser = vi.fn().mockResolvedValue({ ...hod, role: 'staff', is_superuser: false }); account(hod, refreshUser); await prepareTransfer();
-    fireEvent.click(screen.getByRole('button', { name: 'Transfer HOD responsibility' })); await screen.findByText('Ordinary staff account settings');
-    expect(api.transferHod).toHaveBeenCalledWith({ current_password: 'synthetic-current-password', target_staff_id: 2, expected_target_username: 'synthetic_adviser', confirmation: 'TRANSFER HOD' }); expect(refreshUser).toHaveBeenCalledOnce(); expect(api.getCurrentUser).toHaveBeenCalledOnce();
-    expect(screen.queryByRole('heading', { name: 'Transfer HOD responsibility' })).toBeNull();
+  it('offers handover while retaining current HOD access until incoming acceptance', async () => {
+    api.apiRequest.mockResolvedValue({ id: 17, state: 'pending', recipient_id: 2 });
+    const refreshUser = vi.fn(); account(hod, refreshUser); await prepareTransfer();
+    fireEvent.click(screen.getByRole('button', { name: 'Offer HOD handover' }));
+    await screen.findByText('Handover offered.', { exact: false });
+    expect(api.apiRequest).toHaveBeenCalledWith('/api/workflows/handover/', { method: 'POST', body: { target_id: 2 } });
+    expect(api.transferHod).not.toHaveBeenCalled(); expect(refreshUser).not.toHaveBeenCalled();
+    expect(screen.getByRole('heading', { name: 'Department settings' })).toBeTruthy();
   });
-  it('recovers an uncertain transfer by checking identity and never sends it again', async () => {
-    api.transferHod.mockRejectedValueOnce(new api.ApiError('Connection interrupted.', 0)); api.getCurrentUser.mockResolvedValue(hod);
-    account(); await prepareTransfer(); fireEvent.click(screen.getByRole('button', { name: 'Transfer HOD responsibility' }));
-    await screen.findByText('Your account currently still shows HOD access.', { exact: false }); expect(screen.queryByRole('heading', { name: 'Department settings' })).toBeNull(); expect(api.transferHod).toHaveBeenCalledOnce();
-    fireEvent.click(screen.getByRole('button', { name: 'Check current account' })); await waitFor(() => expect(api.getCurrentUser).toHaveBeenCalledTimes(2)); expect(api.transferHod).toHaveBeenCalledOnce();
+  it('checks uncertain handover outcomes without automatically offering again', async () => {
+    api.apiRequest.mockRejectedValueOnce(new api.ApiError('Connection interrupted.', 0)); api.getCurrentUser.mockResolvedValue(hod);
+    account(); await prepareTransfer(); fireEvent.click(screen.getByRole('button', { name: 'Offer HOD handover' }));
+    await screen.findByText('Your account currently still shows HOD access.', { exact: false });
+    expect(api.apiRequest).toHaveBeenCalledOnce();
+    fireEvent.click(screen.getByRole('button', { name: 'Check current account' }));
+    await waitFor(() => expect(api.getCurrentUser).toHaveBeenCalledTimes(2));
+    expect(api.apiRequest).toHaveBeenCalledOnce();
   });
-  it('suspends HOD controls on a forbidden transfer and checks for a role change', async () => {
-    api.transferHod.mockRejectedValueOnce(new api.ApiError('HOD role changed.', 403)); api.getCurrentUser.mockResolvedValue({ ...hod, role: 'staff', is_superuser: false });
-    account(); await prepareTransfer(); fireEvent.click(screen.getByRole('button', { name: 'Transfer HOD responsibility' })); await screen.findByText('Ordinary staff account settings');
-    expect(api.transferHod).toHaveBeenCalledOnce(); expect(api.getCurrentUser).toHaveBeenCalledOnce(); expect(screen.queryByRole('heading', { name: 'Transfer HOD responsibility' })).toBeNull();
+  it('refreshes former HOD authority when an offer is refused after role transfer', async () => {
+    api.apiRequest.mockRejectedValueOnce(new api.ApiError('HOD role changed.', 403));
+    api.getCurrentUser.mockResolvedValue({ ...hod, role: 'staff', is_superuser: false });
+    account(); await prepareTransfer(); fireEvent.click(screen.getByRole('button', { name: 'Offer HOD handover' }));
+    await screen.findByText('Ordinary staff account settings');
+    expect(api.apiRequest).toHaveBeenCalledOnce(); expect(api.getCurrentUser).toHaveBeenCalledOnce();
   });
   it('loads every active staff page for selectors rather than hiding targets after page one', async () => {
     api.listManagedStaff.mockImplementation(async (query) => query.is_active ? page(query.page === 1 ? [colleague] : [nextStaff], query.page === 1 ? 'page2' : null) : page([colleague]));

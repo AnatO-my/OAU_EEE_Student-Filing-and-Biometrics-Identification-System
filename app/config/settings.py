@@ -98,6 +98,7 @@ INSTALLED_APPS = [
     "attendance.apps.AttendanceConfig",
     "record_imports.apps.RecordImportsConfig",
     "documents.apps.DocumentsConfig",
+    "teaching.apps.TeachingConfig",
 ]
 
 MIDDLEWARE = [
@@ -196,7 +197,7 @@ if not DEBUG and not os.environ.get("DJANGO_SECRET_KEY"):
 
 REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": [
-        "rest_framework.authentication.SessionAuthentication",
+        "accounts.authentication.SetupSessionAuthentication",
     ],
     "DEFAULT_PERMISSION_CLASSES": [
         "rest_framework.permissions.IsAdminUser",
@@ -238,3 +239,11 @@ WHATSAPP_PHONE_NUMBER_ID = os.environ.get("WHATSAPP_PHONE_NUMBER_ID", "")
 WHATSAPP_API_VERSION = os.environ.get("WHATSAPP_API_VERSION", "")
 WHATSAPP_RESULT_TEMPLATE = os.environ.get("WHATSAPP_RESULT_TEMPLATE", "")
 WHATSAPP_TEMPLATE_LANGUAGE = os.environ.get("WHATSAPP_TEMPLATE_LANGUAGE", "")
+
+
+# Optional institution headings for guardian result statements; never infer missing identity.
+RESULT_STATEMENT_UNIVERSITY = os.getenv("RESULT_STATEMENT_UNIVERSITY", "OBAFEMI AWOLOWO UNIVERSITY").strip()
+RESULT_STATEMENT_DEPARTMENT = os.getenv("RESULT_STATEMENT_DEPARTMENT", "DEPARTMENT OF ELECTRICAL AND ELECTRONIC ENGINEERING").strip()
+
+# Base portal URL used by link-only departmental notifications.
+TEACHING_PORTAL_URL = os.environ.get("TEACHING_PORTAL_URL", "http://127.0.0.1:5175/portal" if DEBUG else "")

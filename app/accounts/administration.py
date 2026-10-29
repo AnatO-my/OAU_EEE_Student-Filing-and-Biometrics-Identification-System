@@ -12,6 +12,7 @@ from .models import AccountAdministrationAudit, AdviserAssignment
 
 
 MANAGED_PERMISSIONS = frozenset({
+    "teaching.publish_message", "teaching.manage_material", "teaching.manage_timetable", "attendance.manage_biometric_reference", "documents.add_studentdocument", "documents.view_studentdocument",
     "students.view_student", "students.add_student", "students.change_student",
     "students.view_guardian", "students.add_guardian", "students.change_guardian",
     "academics.view_result", "academics.add_result", "academics.change_result", "academics.verify_result",
@@ -189,24 +190,5 @@ def save_assignment(*, actor, values, assignment_id=None):
 
 @transaction.atomic
 def transfer_hod(*, actor, target_staff_id, expected_target_username, current_password, confirmation):
-    actor, users = locked_users(actor, target_staff_id)
-    if confirmation != "TRANSFER HOD":
-        raise ValidationError({"confirmation": "Confirm TRANSFER HOD explicitly."})
-    if not actor.check_password(current_password):
-        raise ValidationError({"current_password": "The current password is incorrect."})
-    target = users.get(target_staff_id)
-    if target is None or target.pk == actor.pk:
-        raise ValidationError({"target_staff_id": "Select another eligible staff account."})
-    eligible_staff(target)
-    if not target.is_active or not target.has_usable_password() or target.username != expected_target_username:
-        raise ValidationError("The selected staff account is inactive, lacks a usable password or no longer matches the reviewed username.")
-    before = {"from": {"id": actor.pk, "username": actor.username, "is_hod": True},
-        "to": {"id": target.pk, "username": target.username, "is_hod": False}}
-    target.is_superuser = True
-    target.save(update_fields=["is_superuser"])
-    actor.is_superuser = False
-    actor.save(update_fields=["is_superuser"])
-    audit(actor, target, "hod_transferred", before,
-        {"from": {"id": actor.pk, "username": actor.username, "is_hod": False},
-         "to": {"id": target.pk, "username": target.username, "is_hod": True}})
-    return actor, target
+    locked_users(actor,target_staff_id)
+    raise ValidationError("Initiate an ownership handover; the incoming HOD must accept before roles change.")

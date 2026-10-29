@@ -1,4 +1,6 @@
 from django.shortcuts import get_object_or_404
+from django.http import Http404, HttpResponse
+from .sharing_pdf import snapshot_bytes
 from django.utils.decorators import method_decorator
 from django.views.decorators.cache import never_cache
 from rest_framework import serializers, status
@@ -13,6 +15,8 @@ from .views import IsActiveHOD, ResultPagination, run_academic_service
 
 # Validate the unique students, session, semester, and channels in a preview request.
 class PreviewSerializer(serializers.Serializer):
+    is_revised = serializers.BooleanField(default=False)
+    revision_reason = serializers.CharField(max_length=1000, required=False, allow_blank=True, default="")
     request_id = serializers.UUIDField()
     student_ids = serializers.ListField(child=serializers.UUIDField(), min_length=1, max_length=100)
     academic_session = serializers.PrimaryKeyRelatedField(queryset=AcademicSession.objects.all())
@@ -117,3 +121,17 @@ class ResultShareListView(HODSharingView):
             "semester": batch.semester, "created_at": batch.created_at, "queued_at": batch.queued_at,
             "counts": dict(Counter(batch.deliveries.values_list("status", flat=True)))} for batch in page]
         return paginator.get_paginated_response(summaries)
+
+
+class ResultSharePDFView(HODSharingView):
+    """Return only the exact PDF saved in this HOD-reviewed student snapshot."""
+    def get(self, request, batch_id, student_id):
+        batch = get_object_or_404(ResultShareBatch, pk=batch_id)
+        item = next((row for row in batch.preview if row["student_id"] == str(student_id)), None)
+        snapshot = ((item or {}).get("report") or {}).get("pdf")
+        if not snapshot:
+            raise Http404
+        content = run_academic_service(snapshot_bytes, snapshot=snapshot)
+        response = HttpResponse(content, content_type="application/pdf")
+        response["Content-Disposition"] = f'inline; filename="{snapshot["filename"]}"'
+        return response

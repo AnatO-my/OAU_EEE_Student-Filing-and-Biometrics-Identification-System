@@ -97,7 +97,7 @@ class CurrentUserSerializer(serializers.ModelSerializer):
             "groups",
             "permissions",
             "adviser_levels",
-            "role",
+            "role", "must_change_password",
         ]
         read_only_fields = fields
 

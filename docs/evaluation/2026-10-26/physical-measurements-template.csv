@@ -1,0 +1,3 @@
+run_id,case_id,item_or_rail,instrument_model_range_resolution,instrument_check,operating_mode,measurement_method,observed_value,unit,repeat,uncertainty_or_limit,evidence_path,status,notes
+,PHY-POWER,,,,,,,,,,,NOT_RUN,Optional actual apparatus only
+,PHY-ENCLOSURE,,,,,,,,,,,NOT_RUN,Record measured dimensions/fit; CAD values are not measurements

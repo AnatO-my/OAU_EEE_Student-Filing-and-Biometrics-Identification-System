@@ -95,3 +95,14 @@ describe('HOD result-sharing page', () => {
     expect(api.preview).not.toHaveBeenCalled(); expect(api.send).not.toHaveBeenCalled();
   });
 });
+
+
+it('shows the authenticated saved PDF before HOD confirmation', () => {
+  const batch = structuredClone(preview);
+  batch.preview[0].report.pdf = { url: '/api/result-shares/batch/students/student/report.pdf' };
+  render(<BatchReview batch={batch} busy={false} reviewed={false} setReviewed={vi.fn()} send={vi.fn()} refresh={vi.fn()} retry={vi.fn()} />);
+  const link = screen.getByRole('link', { name: 'Open PDF result statement' });
+  expect(link.getAttribute('href')).toBe(batch.preview[0].report.pdf.url);
+  expect(link.getAttribute('target')).toBe('_blank');
+  expect(screen.getByRole('button', { name: 'Send 1 email' }).disabled).toBe(true);
+});

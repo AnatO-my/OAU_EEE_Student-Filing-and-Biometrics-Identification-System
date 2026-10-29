@@ -45,7 +45,7 @@ class StudentDocumentSerializer(serializers.ModelSerializer):
             "document_type",
             "original_filename",
             "uploaded_at",
-            "status",
+            "status", "approval_state", "replaces", "review_reason", "superseded_at",
             "ocr_confidence",
             "quality_notes",
         ]

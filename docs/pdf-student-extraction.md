@@ -15,16 +15,21 @@ seven-column result CSV.
 Supply the reviewed attempt number for converted sources. A raw `*_tables.csv`
 has no session heading, so also supply its academic session and semester from
 the original document. A nested student CSV already includes that context;
-PDF context comes from its page headings. Unsupported/scanned layouts need a
-separate conversion or OCR and return an explanatory error.
+PDF context comes from its page headings. pdfplumber reads embedded text/tables;
+it performs no OCR. Image-only PDFs need external OCR. A scanned PDF with an
+existing OCR text layer may work if its text and table layout are compatible.
+Only the defined two-row master layout is parsed, not arbitrary departmental
+sheets. Lines/text options affect detection, not semantic layout support.
 
 Conversion and database matching are combined in one preview action. Review
 extraction issues, source locations and matched result rows before saving scores.
 Literal zero marks require explicit source confirmation; undecided `NG`
 marks remain unresolved. Download the CSV and conversion reports for your private
 source reconciliation. Preparation does not save a database batch or change
-students/results. The later saved batch contains the normalized CSV and its hash;
-the original PDF, extraction trace and conversion options are not archived in it.
+students/results. The later saved batch retains normalized CSV plus the supplied source context,
+reported averages and defined extraction fields, including page/table/notices.
+The original PDF is not archived; keep it and the separate conversion reports
+private. See [source comparison rules](student-result-imports.md#source-reported-averages-and-discrepancies--23-october-2026).
 
 The command-line commands below remain available and use the same parsing and
 adaptation code. Student registration stays in the Students workspace. Unknown
@@ -86,7 +91,7 @@ Both header rows are excluded from student exports. Conflicting matric numbers,
 duplicate students in the same session/semester, unsupported column orders,
 misaligned course groups, and ambiguous session headings cause an error rather
 than a partial student export. Raw table and text exports remain available for
-inspection. Scanned PDFs require OCR before conversion.
+inspection. Image-only PDFs require external OCR before conversion.
 
 ## Read a student's record
 

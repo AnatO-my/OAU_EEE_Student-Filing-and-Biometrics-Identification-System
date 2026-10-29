@@ -88,6 +88,7 @@ class PreviewInput(serializers.Serializer):
     request_id = serializers.UUIDField()
     filename = serializers.CharField(max_length=500)
     csv_text = serializers.CharField(trim_whitespace=False)
+    source_context = serializers.JSONField(required=False, default=dict)
 
 
 class CommitInput(serializers.Serializer):

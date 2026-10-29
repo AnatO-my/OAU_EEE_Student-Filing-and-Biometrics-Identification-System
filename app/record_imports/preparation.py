@@ -71,7 +71,14 @@ def prepared_result(records, *, source_format, data, filename, attempt_number,
         "issues": issues, "trace": trace,
         "reviewed_context": {"attempt_number": attempt_number,
             "include_reviewed_zero_scores": include_reviewed_zero_scores, "context_source": context_source},
-        "complete_history": False}
+        "complete_history": False,
+        "source_context": {"format": source_format, "source_sha256": hashlib.sha256(data).hexdigest(),
+            "csv_sha256": hashlib.sha256(normalized.encode()).hexdigest(),
+            "records": json.loads(json.dumps([{**{key: record.get(key) for key in CSV_FIELDS},
+                "current_semester": record["current_semester"].casefold(),
+                **{key: None if record.get(key) in (None, "") else str(record[key])
+                   for key in ("current_gpa", "previous_gpa", "cgpa")}}
+                for record in records], default=str))}}
 
 
 def read_csv_source(data):
@@ -123,8 +130,13 @@ def prepare_csv(data, filename, *, attempt_number=None, academic_session="", sem
                 courses = json.loads(row["current_courses"], parse_float=Decimal)
             except (ValueError, TypeError, RecursionError):
                 raise PreparationError("The nested converter CSV contains invalid JSON in current_courses. Use its original *_students.csv export.") from None
-            record = {key: row[key].strip() for key in ("matric_number", "current_session", "current_semester", "source_page", "source_table")}
+            record = {key: row[key].strip() for key in CSV_FIELDS}
             record["current_courses"] = courses
+            try:
+                for key in ("outstanding_courses", "notices"):
+                    record[key] = json.loads(row[key])
+            except (ValueError, TypeError, RecursionError):
+                raise PreparationError("Invalid outstanding-course/notices JSON in the converter export.") from None
             records.append(record)
         validate_context(academic_session, semester)
         if academic_session and any(record["current_session"] != academic_session or record["current_semester"].casefold() != semester for record in records):

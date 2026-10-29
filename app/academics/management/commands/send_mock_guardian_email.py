@@ -65,7 +65,8 @@ class Command(BaseCommand):
         except ValidationError as error:
             raise CommandError(" ".join(error.messages)) from None
         delivery = SimpleNamespace(pk=uuid.uuid4(), destination=recipient,
-                                   subject="[TEST ONLY] Guardian result email", body=body)
+                                   subject="[TEST ONLY] Guardian result email", body=body, student_id="mock-transport-only",
+                                   batch=SimpleNamespace(preview=[{"student_id": "mock-transport-only", "report": None}]))
         try:
             submit_email(delivery)
         except RejectedSubmission:

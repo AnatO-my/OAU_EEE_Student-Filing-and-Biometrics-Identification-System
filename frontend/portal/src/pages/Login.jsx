@@ -1,11 +1,13 @@
 import { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
 import Sectionheader from "../components/Sectionheader";
 import { useAuth } from "../auth/useAuth";
+import { messageReturnPath } from "../auth/messageReturnPath";
 
 const Login = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const { signIn } = useAuth();
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
@@ -19,7 +21,7 @@ const Login = () => {
       const identity = await signIn(username.trim(), password);
       setPassword("");
       toast.success("Signed in successfully.", { position: "top-center" });
-      navigate(`/portal/${identity.role}/dashboard`);
+      navigate(messageReturnPath(identity.role, location.state?.from) || `/portal/${identity.role}/dashboard`);
     } catch (error) {
       const retryAfter = error.retryAfter
         ? ` The server asked you to wait: ${error.retryAfter}.`

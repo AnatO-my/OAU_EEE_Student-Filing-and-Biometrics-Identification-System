@@ -137,3 +137,25 @@ describe('session and byte-preserving API adapter', () => {
     expect(url.pathname).toBe('/api/imports/'); expect(url.searchParams.get('page')).toBe('2'); expect(url.searchParams.get('kind')).toBe('results');
   });
 });
+
+
+it('accepts arbitrary private file types and preserves downloaded bytes', async () => {
+  const bytes = new Uint8Array([37, 80, 68, 70, 45, 0, 255, 10]);
+  fetchMock.mockResolvedValueOnce(new Response(bytes, { headers: { 'Content-Type': 'application/octet-stream' } }));
+  const blob = await api.apiRequest('/api/teaching/materials/test/versions/1/download/', { responseType: 'blob' });
+  expect(fetchMock.mock.calls[0][1].headers.Accept).toBe('*/*');
+  expect(new Uint8Array(await blob.arrayBuffer())).toEqual(bytes);
+});
+
+it('sends course material multipart bytes with CSRF and lets the browser set the boundary', async () => {
+  const data = new FormData();
+  data.set('offering', '4');
+  data.set('upload', new File(['%PDF-1.4 synthetic'], 'notes.pdf', { type: 'application/pdf' }));
+  fetchMock.mockResolvedValueOnce(json({ csrfToken: 'material-csrf' })).mockResolvedValueOnce(json({ version: 1 }, 201));
+  await api.apiRequest('/api/teaching/materials/', { method: 'POST', rawBody: data });
+  const request = fetchMock.mock.calls[1][1];
+  expect(request.body).toBe(data);
+  expect(request.headers['X-CSRFToken']).toBe('material-csrf');
+  expect(request.headers['Content-Type']).toBeUndefined();
+  expect(request.body.get('upload').name).toBe('notes.pdf');
+});

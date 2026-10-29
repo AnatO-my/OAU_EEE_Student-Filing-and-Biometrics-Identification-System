@@ -1,0 +1,25 @@
+{
+  "checked_at_utc": "2026-10-26T11:23:28.306340+00:00",
+  "database_profile": "config.postgres_settings",
+  "backup": "aiven-20261026T1119467450460Z.dump",
+  "backup_sha256": "4e1e07a2162c7f31fa66d2b1f7374d14e7b2ba591a0880d1bf9458f2df3d6b99",
+  "restore_verified": true,
+  "pending_migrations_applied": true,
+  "migration_check_passed": true,
+  "database_system_check_passed": true,
+  "portal_build_passed": true,
+  "guardian_build_passed": true,
+  "backend_ready_http_status": 200,
+  "backend_ready_body": {
+    "status": "ok"
+  },
+  "portal_login_http_status": 200,
+  "anonymous_protected_route_status": {
+    "messages": 403,
+    "materials": 403,
+    "timetable": 403
+  },
+  "email_worker_started": false,
+  "operational_test_results_inferred": false,
+  "notes": "Existing update-local.ps1 verified restoration, migrated, checked the database and entered run_local.py; live readiness and proxy endpoints verified independently. Services remain in the interactive update terminal."
+}

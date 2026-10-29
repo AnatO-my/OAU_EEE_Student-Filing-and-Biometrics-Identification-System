@@ -197,3 +197,28 @@ SQLite database and in-memory email. Production supervision, real PostgreSQL
 concurrency tests, approved WhatsApp template/token, Meta acceptance, institutional
 contact/permission review and production delivery monitoring remain pending.
 See guardian-result-sharing-validation.md for the current validation record.
+
+
+### Reviewed PDF email statements
+
+New email previews save a deterministic A4 PDF for each student's selected period.
+The HOD can open **Open PDF result statement** before confirming the batch. The PDF
+endpoint requires the active HOD role and returns `Cache-Control: no-store`; its
+student ID must belong to that batch. PDF bytes are stored in the private preview
+snapshot and covered by the reviewed digest. API JSON returns only the filename,
+SHA-256, size and authenticated preview URL, not the encoded document.
+
+Email delivery attaches those exact reviewed bytes as `application/pdf`. The table
+contains only selected-period courses; CGPA and cumulative recorded credits use
+verified history through that period. Existing calculation rules and grading scales
+remain authoritative. This is a recorded-results summary, not an official transcript.
+No unrecorded student biodata, institutional seal, signature or certification is added.
+Set `RESULT_STATEMENT_UNIVERSITY` and `RESULT_STATEMENT_DEPARTMENT` in the server
+environment to override the project defaults: Obafemi Awolowo University and its Department of Electrical and Electronic Engineering. Explicitly empty settings omit the corresponding heading.
+
+Historical batches without saved PDFs keep their original plain-email behavior.
+WhatsApp formatting is unchanged. Result/contact/permission changes still invalidate
+queued review; corrected statements require a fresh preview and HOD confirmation.
+Retries retain the same saved statement and existing failed/unknown/accepted safeguards.
+Install the pinned `reportlab` dependency with the normal requirements installation.
+No schema migration is required.

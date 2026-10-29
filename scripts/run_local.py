@@ -13,6 +13,7 @@ import tempfile
 import time
 import urllib.error
 import urllib.request
+from urllib.parse import urlparse
 
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -44,6 +45,7 @@ def local_environment(backend_port=BACKEND_PORT, frontend_port=FRONTEND_PORT):
         "VITE_API_PROXY_TARGET": f"http://127.0.0.1:{backend_port}",
         "STUDENT_ACCOUNT_FRONTEND_ORIGIN": f"http://127.0.0.1:{frontend_port}",
     })
+    environment.setdefault("TEACHING_PORTAL_URL", f"http://127.0.0.1:{frontend_port}/portal")
     # Student-access emails use this launcher's actual frontend port. Ordinary
     # recovery stays disabled with a console backend so reset links cannot be
     # printed to terminal output instead of being sent privately.
@@ -61,10 +63,24 @@ def local_environment(backend_port=BACKEND_PORT, frontend_port=FRONTEND_PORT):
     return environment
 
 
-def checked_command(arguments, environment):
-    result = subprocess.run(arguments, cwd=ROOT, env=environment, creationflags=NO_WINDOW)
+def checked_command(arguments, environment, *, label="Startup check", hint="Resolve this check before starting local services."):
+    print(f"Checking: {label}", flush=True)
+    # CREATE_NO_WINDOW can detach a child's console handles on Windows. Capture
+    # explicitly and forward through this supervisor so errors remain visible.
+    command_environment = {**environment, "PYTHONIOENCODING": "utf-8"}
+    result = subprocess.run(arguments, cwd=ROOT, env=command_environment,
+        creationflags=NO_WINDOW, capture_output=True, text=True, encoding="utf-8", errors="replace")
+    for output in (result.stdout, result.stderr):
+        # Never echo configured credentials even if a dependency includes one in
+        # a traceback. The connection command already uses fixed diagnostics.
+        for name, value in environment.items():
+            if value and any(part in name.upper() for part in ("PASSWORD", "TOKEN", "SECRET")):
+                output = output.replace(value, "[redacted]")
+        if output.strip():
+            print(output.rstrip(), flush=True)
     if result.returncode:
-        raise RuntimeError("Startup check failed. Resolve the preceding check before starting local services.")
+        raise RuntimeError(f"{label} failed (exit {result.returncode}). {hint}")
+    print(f"Passed: {label}", flush=True)
 
 
 def check_port(port):
@@ -85,13 +101,24 @@ def check_worker(environment):
         raise RuntimeError("Select the configured SMTP email backend before enabling the email worker.")
 
 
+def check_teaching_worker(environment):
+    backend = environment.get("DJANGO_EMAIL_BACKEND", "")
+    if backend not in {"academics.email_backend.EmailBackend", "django.core.mail.backends.smtp.EmailBackend"} or not all(
+        environment.get(name, "").strip() for name in ("DJANGO_EMAIL_HOST", "DJANGO_EMAIL_HOST_USER", "DJANGO_EMAIL_HOST_PASSWORD")
+    ):
+        raise RuntimeError("Configure the private SMTP provider before using -TeachingNotifications. Normal startup does not send announcements.")
+    origin = urlparse(environment.get("TEACHING_PORTAL_URL", ""))
+    if origin.scheme not in {"http", "https"} or not origin.netloc or origin.username or origin.password or origin.query or origin.fragment:
+        raise RuntimeError("Set TEACHING_PORTAL_URL to the website's absolute portal URL before starting announcement notifications.")
+
+
 def stop_children(children, stop_file):
     # These are exact Popen handles created here; never stop a process discovered
     # by port or name, and never terminate an unrelated server or worker.
-    if any(name == "email worker" and process.poll() is None for name, process in children):
+    if any(name in {"email worker", "teaching notification worker"} and process.poll() is None for name, process in children):
         stop_file.touch()
         for name, process in children:
-            if name == "email worker":
+            if name in {"email worker", "teaching notification worker"}:
                 try:
                     process.wait(timeout=30)
                 except subprocess.TimeoutExpired:
@@ -101,7 +128,7 @@ def stop_children(children, stop_file):
             process.terminate()
     for name, process in reversed(children):
         try:
-            process.wait(timeout=30 if name == "email worker" else 10)
+            process.wait(timeout=30 if name in {"email worker", "teaching notification worker"} else 10)
         except subprocess.TimeoutExpired:
             process.kill()
             process.wait(timeout=5)
@@ -128,6 +155,7 @@ def wait_ready(children, url, *, database=False):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--email-worker", action="store_true", help="Process queued email reports using this terminal's configured provider.")
+    parser.add_argument("--teaching-notifications", action="store_true", help="Explicitly process queued announcement emails with the configured SMTP provider.")
     parser.add_argument("--check-only", action="store_true", help="Perform read-only prerequisites without starting any server or worker.")
     parser.add_argument("--backend-port", type=int, default=BACKEND_PORT)
     parser.add_argument("--frontend-port", type=int, default=FRONTEND_PORT)
@@ -141,9 +169,13 @@ def main():
         raise RuntimeError("Install Node.js and run npm ci in frontend/portal first. See docs/local-laptop.md.")
     if options.email_worker:
         check_worker(environment)
+    if options.teaching_notifications:
+        check_teaching_worker(environment)
     print("Checking the configured PostgreSQL connection and pending migrations...", flush=True)
-    checked_command([sys.executable, "manage.py", "check_database_connection"], environment)
-    checked_command([sys.executable, "manage.py", "migrate", "--check"], environment)
+    checked_command([sys.executable, "manage.py", "check_database_connection"], environment,
+        label="PostgreSQL connection", hint="Run manage.py check_database_connection in this configured terminal and resolve its diagnostic.")
+    checked_command([sys.executable, "manage.py", "migrate", "--check"], environment,
+        label="Migration readiness", hint="Run .\\.venv\\Scripts\\python.exe manage.py migrate --plan. If migrations are pending, stop all local servers/workers and run .\\scripts\\update-local.ps1 for the backed-up update.")
     if options.check_only:
         print("Local prerequisites passed. No server, worker, migration or import was started.", flush=True)
         return 0
@@ -162,6 +194,8 @@ def main():
         ]
         if options.email_worker:
             commands.append(("email worker", [sys.executable, "manage.py", "process_result_shares", "--channel", "email", "--watch", "--interval", "5", "--limit", "25", "--stop-file", str(stop_file)]))
+        if options.teaching_notifications:
+            commands.append(("teaching notification worker", [sys.executable, "manage.py", "send_teaching_notifications", "--watch", "--interval", "5", "--limit", "25", "--stop-file", str(stop_file)]))
         for name, command in commands:
             children.append((name, subprocess.Popen(command, cwd=PORTAL if name == "frontend" else ROOT, env=environment,
                 creationflags=NO_WINDOW | (subprocess.CREATE_NEW_PROCESS_GROUP if os.name == "nt" else 0))))

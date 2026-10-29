@@ -3,7 +3,7 @@ from django.db.models import Count
 from django.core.exceptions import ValidationError as DjangoValidationError
 from django.shortcuts import get_object_or_404
 from rest_framework import permissions, status
-from rest_framework.authentication import SessionAuthentication
+from accounts.authentication import SetupSessionAuthentication
 from rest_framework.exceptions import APIException, UnsupportedMediaType, ValidationError
 from rest_framework.response import Response
 
@@ -29,7 +29,7 @@ class CaptureConflictResponse(APIException):
     default_detail = "Capture evidence conflicts with previously accepted data."
 
 
-class CaptureSessionAuthentication(SessionAuthentication):
+class CaptureSessionAuthentication(SetupSessionAuthentication):
     def enforce_csrf(self, request):
         # Django's CSRF check looks for POST form fields before its header fallback.
         # On a DRF Request that invokes parsers, which this opaque JSONL endpoint
@@ -96,6 +96,7 @@ class PendingBatchesView(PendingAccessView):
             {"batch_id": str(batch.pk), "class_session_id": str(batch.session_id),
              "metadata": batch.metadata, "event_count": batch.event_count,
              "received_at": batch.imported_at, "state": "pending_review",
+             "archive_retention": "until_explicit_resolution", "automatic_matching_available": False,
              "identity_review_required": True, "timing_review_required": True,
              "device_authenticated": False, "recovery_review_required": batch.recovery_review_required}
             for batch in page

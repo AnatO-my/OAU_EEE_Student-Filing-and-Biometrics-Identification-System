@@ -1,5 +1,91 @@
 # Short OLED functionality test
 
+## Top-two-row integrity test - 28 October 2026
+
+The current terminal uses the SH1106 adapter. Its dedicated
+`esp32-oled-integrity` test uses that same `oled_pages.h` transport, GPIO21/22
+and 100 kHz I2C, with automatic detection at `0x3C`/`0x3D`. It sends no scanner
+commands and performs no filesystem, RTC or network operations.
+
+Run the prepared PowerShell launcher from any directory:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File "C:\Users\Ot\Downloads\EEE-Project\hardware\fingerprint-diagnostic\run_oled_test.ps1"
+```
+
+The launcher defaults to COM12; add `-Port COM7` for another board port.
+It builds the test, verifies the live partition layout and uploads only the
+application at 57600 baud before opening the serial monitor at 115200.
+Use `-BuildOnly` to compile without accessing the board. The previous SSD1306
+test remains available with `-Test Basic`.
+
+Press EN/RESET after the serial monitor opens. Watch at least one complete
+cycle (approximately one minute):
+
+1. **Numbered text:** rows 1-8 display the same digit sample. The first two
+   text rows occupy pixel y=0..15; the six lower rows occupy y=16..63.
+2. **White and black:** look for missing dark lines, stuck lit pixels or noise.
+3. **Horizontal and vertical stripes, then their inverses:** alternate individual
+   pixel rows/columns so adjacent lines can be compared.
+4. **Opposite checkerboards:** the squares should remain regular over the panel.
+5. **Top-only and lower-only fills:** check that y=0..15 changes cleanly between
+   white and black, with the lower region showing the opposite fill.
+6. **Eight-pixel bands:** each numbered text-row region lights separately.
+7. **Single-pixel-row sweep:** a full-width horizontal line moves through every
+   y position from 0 to 63, pausing longer over the top 16 pixel rows.
+
+The serial output names each step and the tested y range. Send these commands
+with Enter (CR/LF is ignored):
+
+| Command | Action |
+| --- | --- |
+| `p` | Pause/resume the sequence; the held pattern is still rewritten |
+| `n` | Next pattern, band or pixel row; remains paused if already paused |
+| `t` | Hold the numbered text grid for comparison or a photograph |
+| `r` | Restart the automatic cycle |
+| `h` | Print the test instructions |
+
+Every refresh rewrites all eight display pages, including while paused.
+Successful I2C writes establish communication, not physical pixel integrity.
+Record which text rows or pixel y positions are affected, the pattern name,
+whether the lower rows are clean, and whether noise returns while paused.
+The photograph supplied on 28 October shows apparent corruption in the top
+two text lines; it does not establish the cause. The user subsequently reported
+issues on lines 2, 4, 6, 8, 10 and 12, and confirmed these are individual pixel
+lines. They fall within the top 16-pixel band whether counted from zero or one.
+
+Preparation validation on 28 October: Windows PowerShell syntax/help and the
+launcher's build-only run passed. `esp32-oled-integrity` compiles with the pinned
+ESP32 framework. Native C++11 checks pass for all 64 pixel rows, eight bands,
+top/lower masks, complementary patterns and repeated text samples; the existing
+SSD1306/SH1106 page-transport tests also pass. No board upload was made during
+this preparation.
+
+**The terminal now reserves y=0..15.** Its six logical text rows render at
+y=16..63 through the shared `terminal_screen.h` renderer. Notices, clock editing,
+maintenance, mode selection and menu footers all use this region. Home keeps
+mode/run state, finger instructions, readiness and counts visible; template
+totals remain on Statistics. Deferred screens retain their pending-identity
+wording, and the class-session UUID remains complete across two lines.
+The integrity test deliberately continues to exercise all 64 pixel lines.
+Avoiding the damaged band is a layout workaround; it does not establish or
+repair the underlying cause. Visual confirmation of the revised terminal is pending.
+
+Workaround validation: the `esp32-sh1106` terminal build passes. Native C++11
+checks with warnings treated as errors pass for the shared screen renderer,
+OLED transport, legacy terminal actions, combined attendance modes, unified
+capture and Wi-Fi transfer UI. The renderer tests check a blank top 16-pixel
+band, the last character/footer position, clearing stale pixels and framebuffer
+bounds. Menu tests check all nine pages and the complete two-line class UUID.
+
+Ctrl+C closes the monitor. To restore the user's working terminal, run:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File "C:\Users\Ot\Downloads\EEE-Project\hardware\fingerprint-diagnostic\src\upload_script.ps1" -Port COM12
+```
+
+## Original SSD1306 test
+
 This separate PlatformIO/Arduino build follows the supplied original MicroPython
 code: **SSD1306, 128x64, I2C address 0x3C or 0x3D**. It needs no extra libraries.
 

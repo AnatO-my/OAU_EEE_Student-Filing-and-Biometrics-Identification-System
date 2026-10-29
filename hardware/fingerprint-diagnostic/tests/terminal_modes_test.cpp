@@ -71,4 +71,31 @@ int main() {
   attendanceTerminal.key(1); assert(attendanceTerminal.state()==State::Idle && deletes==0);
   attendanceTerminal.key(2); assert(attendanceTerminal.page()==8);
   attendanceTerminal.key(1); assert(attendanceTerminal.state()==State::Idle && deletes==0);
+
+  // Every menu keeps its controls in the sixth usable line. The full class
+  // UUID must survive the smaller layout, rather than being clipped at the end.
+  capture.ready=true; capture.count=512; combined(capture);
+  assert(std::string(terminalHardware.last.line[1])=="STOPPED: MENU > START");
+  for(unsigned page=0;page<9;++page) {
+    assert(attendanceTerminal.page()==page);
+    assert(terminalHardware.last.line[terminal::SCREEN_FOOTER][0]);
+    for(unsigned i=0;i<256;++i) assert(terminalHardware.pixels[i]==0);
+    if(page==1) assert(std::string(terminalHardware.last.line[2]).find("Templates:")==0);
+    if(page==8) {
+      assert(std::string(terminalHardware.last.line[0])=="CLASS SESSION UUID");
+      assert(std::string(terminalHardware.last.line[2])+terminalHardware.last.line[3]==capture.classId());
+      assert(std::string(terminalHardware.last.line[4])=="Saved captures: 512");
+    }
+    attendanceTerminal.key(2);
+  }
+  modeMenu(); attendanceTerminal.key(1); attendanceTerminal.key(0);
+  assert(std::string(terminalHardware.last.line[0])=="DEFERRED CAPTURE");
+  assert(std::string(terminalHardware.last.line[1])=="RUNNING: LIFT FINGER");
+  assert(std::string(terminalHardware.last.line[2])=="Saved: 512 PENDING");
+  assert(std::string(terminalHardware.last.line[3])=="No identity decision");
+  assert(std::string(terminalHardware.last.line[4])=="Class batch prepared");
+  attendanceTerminal.key(2);
+  assert(std::string(terminalHardware.last.line[1])=="Time: boot-relative");
+  assert(std::string(terminalHardware.last.line[2])=="Captures: 512 PENDING");
+  assert(std::string(terminalHardware.last.line[3])=="Not a presence count");
 }

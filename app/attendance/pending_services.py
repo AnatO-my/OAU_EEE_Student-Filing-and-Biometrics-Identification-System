@@ -63,6 +63,8 @@ def _summary(capture_file, batch, stored_count):
         "existing_events": min(count, stored_count),
         "batch_event_count": max(count, stored_count),
         "state": "pending_review",
+        "archive_retention": "until_explicit_resolution",
+        "automatic_matching_available": False,
         "identity_review_required": True,
         "timing_review_required": True,
         "device_authenticated": False,

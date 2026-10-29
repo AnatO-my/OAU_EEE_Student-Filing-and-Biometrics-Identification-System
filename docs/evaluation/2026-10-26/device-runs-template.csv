@@ -1,0 +1,4 @@
+run_id,device_run_id,device_class,device_model,os_version,browser_version,viewport,build_revision,served_build,connection_mode,url,case_id,planned_repetitions,completed_repetitions,status,evidence_paths,notes
+,DEV-PC,PC,,,,,,,,,,,,NOT_RUN,,
+,DEV-ANDROID,Android,,,,,,,,,,,,NOT_RUN,,
+,DEV-IOS,iPhone,,,,,,,,,,,,NOT_RUN,,

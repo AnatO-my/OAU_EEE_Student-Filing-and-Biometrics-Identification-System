@@ -24,6 +24,10 @@ class StudentDocument(models.Model):
         BIODATA = "biodata", "Biodata"
         BIRTH_CERTIFICATE = "birth_cecrtificate", "birth certificate"
         OTHER = "other", "other"
+        CLEARANCE = "clearance", "Clearance certificate"
+        JAMB = "jamb", "JAMB result"
+        WAEC = "waec", "WAEC result"
+        STATE_ORIGIN = "state_origin", "State of origin certificate"
     class Status(models.TextChoices):
         ACCEPTED = "accepted", "Accepted"
         NEEDS_REVIEW = "needs_review", "Needs review"
@@ -52,6 +56,11 @@ class StudentDocument(models.Model):
         choices=Status.choices,
         default=Status.NEEDS_REVIEW,
     )
+    approval_state = models.CharField(max_length=12, default="active", choices=[("active","Active"),("pending","Pending approval"),("archived","Archived"),("rejected","Rejected")])
+    replaces = models.ForeignKey("self", null=True, blank=True, on_delete=models.PROTECT)
+    reviewed_by = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, on_delete=models.PROTECT, related_name="reviewed_documents")
+    reviewed_at = models.DateTimeField(null=True)
+    review_reason = models.CharField(max_length=1000, blank=True)
     ocr_text = models.TextField(blank=True)
     ocr_confidence = models.FloatField(null=True, blank=True)
     quality_notes = models.CharField(max_length=255, blank=True)

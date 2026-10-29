@@ -35,7 +35,7 @@ def setup_account_data(account):
     if account is None:
         return None
     return {"id": account.pk, "username": account.username, "email": account.email,
-        "is_active": account.is_active, "setup_pending": not account.has_usable_password()}
+        "is_active": account.is_active, "setup_pending": not account.has_usable_password() or account.must_change_password}
 
 
 def student_account(*, actor, student_id):
@@ -63,22 +63,7 @@ def issue_student_setup(*, actor, student_id, values):
     if set(values) - {"username", "email"}:
         raise ValidationError("Supply only the student username and optional email.")
     if student.user_id is None:
-        requested_username = values.get("username", student.identifier_value)
-        using_identifier = "username" not in values or requested_username == student.identifier_value
-        account = get_user_model()(username=requested_username, email=values.get("email", ""),
-            is_active=True, is_staff=False, is_superuser=False)
-        account.set_unusable_password()
-        account.full_clean()
-        if using_identifier and account.username != student.identifier_value:
-            raise ValidationError({"username": "This username requires normalization. Review it explicitly instead of silently changing the student identifier."})
-        try:
-            with transaction.atomic():
-                account.save()
-        except IntegrityError:
-            raise ValidationError({"username": "An account with this username already exists."}) from None
-        student.user = account
-        student.save(update_fields=["user"])
-        action = "student_setup_issued"
+        raise ValidationError("New student accounts require the department temporary-password workflow. Setup links are retained only for existing legacy pending accounts.")
     else:
         if values:
             raise ValidationError("This student already has an account. Reissue its pending setup link without changing username or email.")

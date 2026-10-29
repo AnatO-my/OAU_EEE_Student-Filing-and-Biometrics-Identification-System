@@ -80,6 +80,7 @@ export function Workspace({ api }) {
   const [reloadCatalog, setReloadCatalog] = useState(0);
   const [selectedSession, setSession] = useState('');
   const [semester, setSemester] = useState('harmattan');
+  const [isRevised, setIsRevised] = useState(false), [revisionReason, setRevisionReason] = useState('');
   const [selected, setSelected] = useState({});
   const [batch, setBatch] = useState(null);
   const [reviewed, setReviewed] = useState(false);
@@ -107,7 +108,7 @@ export function Workspace({ api }) {
   }
   async function preview() {
     setBusy(true); setError(''); setNotice('');
-    const payload = { student_ids: Object.keys(selected).sort(), academic_session: Number(session), semester, channels: ['email'] };
+    const payload = { student_ids: Object.keys(selected).sort(), academic_session: Number(session), semester, channels: ['email'], is_revised: isRevised, revision_reason: revisionReason };
     const signature = JSON.stringify(payload);
     if (attempt.current?.signature !== signature) attempt.current = { signature, id: crypto.randomUUID() };
     try {
@@ -169,6 +170,7 @@ export function Workspace({ api }) {
         <option value="">{catalogLoading ? 'Loading sessions…' : 'Choose a session'}</option>{sessions.map((row) => <option key={row.id} value={row.id}>{row.name}</option>)}</select></label>
         <label>Semester<select value={semester} disabled={busy} onChange={(e) => { invalidate(); setSemester(e.target.value); }}><option value="harmattan">Harmattan</option><option value="rain">Rain</option></select></label></div>
       {!catalogLoading && !sessions.length && !catalogError && <Empty>No academic sessions are available. Add the session in academic administration first.</Empty>}
+      <label><input type="checkbox" checked={isRevised} disabled={busy} onChange={e=>{invalidate();setIsRevised(e.target.checked);}}/> This is a revised result</label>{isRevised&&<label>Internal revision reason<textarea value={revisionReason} onChange={e=>{invalidate();setRevisionReason(e.target.value);}} required maxLength={1000}/><span>The reason is retained internally and never included in guardian emails or PDFs.</span></label>}
       <StudentPicker api={api} selected={selected} toggle={toggleStudent} disabled={busy} />
       <div className="selected"><strong>{students.length} selected</strong><div className="chips">{students.map((row) => <button key={row.student_id} disabled={busy} onClick={() => toggleStudent(row)} aria-label={`Remove ${row.full_name}`}>{row.full_name} ×</button>)}</div></div>
       <div className="actions"><button className="primary" disabled={busy || !students.length || !session || !!catalogError} onClick={preview}>{busy ? 'Preparing…' : 'Preview guardian emails'}</button><span>Previewing sends nothing.</span></div>

@@ -1,4 +1,5 @@
 import { useRef, useState } from 'react';
+import { CoursePolicy, MeetingReview, BiometricReferences, StudentEligibility } from './AttendancePolicy';
 import * as api from '../api';
 import { Alert, Empty, Pager, RemoteState, Table } from './ui';
 import { formatDate, hasPermission, isHod, useRemote } from './resources';
@@ -99,6 +100,7 @@ function SessionDetail({ sessionId, user, onClosed }) {
     <h3>{session.title}</h3><p>Offering {session.offering} · {session.status} · Roster revision {session.roster_revision}</p><p>{formatDate(session.starts_at)} – {formatDate(session.ends_at)}</p>
     {session.status === 'open' && hasPermission(user, 'attendance.manage_attendance') && <form className="live-filters" onSubmit={close}><label className="live-check"><input type="checkbox" required disabled={busy} /> Close this class permanently</label><button disabled={busy}>Close class</button></form>}
     {hasPermission(user, 'attendance.record_attendance') && <ManualRecord session={session} onSaved={records.reload} />}
+    {(hasPermission(user, 'attendance.correct_attendance') || hasPermission(user, 'attendance.import_pending_captures')) && <MeetingReview session={session} user={user} onSaved={records.reload} />}
   </>}</RemoteState><h3>Attendance records</h3><p className="live-hint">Student identifiers below are backend record IDs. Unrecorded roster members are not inferred absent.</p>
     <RemoteState resource={records}>{(data) => <>{!data.results.length ? <Empty>No attendance has been recorded for this class.</Empty> : <Table headings={['Student record ID', 'Status', 'Recorded', 'Reason', ...(hasPermission(user, 'attendance.correct_attendance') ? ['Correction'] : [])]}>
       {data.results.map((row) => <tr key={row.id}><td>{row.student_id}</td><td>{row.status}</td><td>{formatDate(row.recorded_at)}</td><td>{row.reason}</td>{hasPermission(user, 'attendance.correct_attendance') && <td><Correction row={row} onSaved={records.reload} /></td>}</tr>)}</Table>}<Pager page={page} data={data} onChange={setPage} /></>}</RemoteState>
@@ -175,8 +177,8 @@ function CoursePreparation() {
 export default function Attendance({ user }) {
   const [selected, setSelected] = useState('');
   const resource = useRemote((signal) => user.role === 'student' ? Promise.resolve([]) : api.collectPages(api.listAttendanceSessions, signal), [user.role]);
-  if (user.role === 'student') return <StudentAttendance />;
-  return <>{isHod(user) && <CoursePreparation />}<section className="live-card"><div className="live-row"><h2>Classes</h2><button onClick={resource.reload}>Refresh classes</button></div>
+  if (user.role === 'student') return <><StudentEligibility /><StudentAttendance /></>;
+  return <>{hasPermission(user, 'attendance.manage_biometric_reference') && <BiometricReferences />}{hasPermission(user, 'attendance.view_attendance') && <CoursePolicy user={user} />}{isHod(user) && <CoursePreparation />}<section className="live-card"><div className="live-row"><h2>Classes</h2><button onClick={resource.reload}>Refresh classes</button></div>
     <RemoteState resource={resource}>{(rows) => <><p>{rows.length} accessible classes · {rows.filter((row) => row.status === 'open').length} open</p>
       {!rows.length ? <Empty>No classes are available for your current course assignments.</Empty> : <><label>Choose a class<select value={selected} onChange={(event) => setSelected(event.target.value)}><option value="">Choose a class</option>{rows.map((row) => <option key={row.id} value={row.id}>{row.title} · Offering {row.offering} · {row.status}</option>)}</select></label>
         <Table headings={['Class', 'Offering ID', 'Starts', 'Status']} >{rows.map((row) => <tr key={row.id}><td><button onClick={() => setSelected(row.id)}>{row.title}</button></td><td>{row.offering}</td><td>{formatDate(row.starts_at)}</td><td>{row.status}</td></tr>)}</Table></>}

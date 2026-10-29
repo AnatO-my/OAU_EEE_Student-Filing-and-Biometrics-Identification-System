@@ -1,10 +1,13 @@
 """HOD-reviewed result snapshots and durable delivery queue; no network in requests."""
+import copy
 import hashlib
 import json
 import re
 import textwrap
 from collections import Counter
 
+from django.conf import settings
+from django.urls import reverse
 from django.core.exceptions import ValidationError
 from django.core.validators import validate_email
 from django.db import IntegrityError, transaction
@@ -16,6 +19,7 @@ from .grading import grade_point_for_score
 from .models import (CourseOffering, GuardianSharingPreference, ResultShareBatch,
                      ResultShareDelivery)
 from .services import require_hod
+from .sharing_pdf import make_snapshot, uses_pdf
 
 
 # Create a stable SHA-256 fingerprint for a preview's serialized content.
@@ -37,7 +41,7 @@ def contact(guardian, channel):
 
 
 # Build a verified-results report and cumulative average through the selected semester.
-def report_for(student, session, semester):
+def report_for(student, session, semester, *, include_pdf=False, is_revised=False):
     # CGPA is cumulative as of the selected period, excluding later results.
     results = list(student.results.select_related("grading_scale", "offering__course",
         "offering__academic_session").order_by("pk"))
@@ -63,16 +67,22 @@ def report_for(student, session, semester):
                          f'grade point {row["grade_point"]}, attempt {row["attempt"]}')
     lines += [f"Semester GPA: {gpa}", f"Cumulative CGPA through this period: {cgpa}",
               "Verified recorded results; this is not certification of complete academic history."]
-    return {"gpa": str(gpa), "cgpa": str(cgpa), "records": records, "text": "\n".join(lines)}
+    report = {"gpa": str(gpa), "cgpa": str(cgpa), "records": records, "text": "\n".join(lines)}
+    if include_pdf:
+        report["pdf"] = make_snapshot(name=student.full_name, identifier=student.identifier_value,
+            session=session.name, semester=semester, report=report, is_revised=is_revised,
+            university=getattr(settings, "RESULT_STATEMENT_UNIVERSITY", ""),
+            department=getattr(settings, "RESULT_STATEMENT_DEPARTMENT", ""))
+    return report
 
 
 # Create human-reviewable diagnostics and corresponding draft or skipped delivery rows.
-def build_preview(students, session, semester, channels):
+def build_preview(students, session, semester, channels, *, include_pdf=True, is_revised=False):
     preview, deliveries = [], []
     for student in students:
         error, report = "", None
         try:
-            report = report_for(student, session, semester)
+            report = report_for(student, session, semester, include_pdf=include_pdf and "email" in channels, is_revised=is_revised)
         except ValidationError:
             error = "results_missing_or_unverified"
         item = {"student_id": str(student.pk), "name": student.full_name,
@@ -123,23 +133,25 @@ def lock_students(ids):
 
 @transaction.atomic
 # Create an idempotent HOD preview and persist its delivery rows without contacting providers.
-def create_preview(*, user, request_id, student_ids, academic_session, semester, channels):
+def create_preview(*, user, request_id, student_ids, academic_session, semester, channels, is_revised=False, revision_reason=""):
     require_hod(user)
+    if is_revised and not revision_reason.strip():
+        raise ValidationError("Record an internal revision reason.")
     ids, channels = sorted(str(i) for i in student_ids), sorted(channels)
     students = lock_students(ids)
     existing = ResultShareBatch.objects.filter(pk=request_id).first()
     if existing:
         if (existing.created_by_id != user.pk or existing.student_ids != ids or
                 existing.channels != channels or existing.academic_session_id != academic_session.pk
-                or existing.semester != semester):
+                or existing.semester != semester or existing.is_revised != is_revised or existing.revision_reason != revision_reason):
             raise ValidationError("This request_id belongs to a different request.")
         return existing
-    preview, deliveries = build_preview(students, academic_session, semester, channels)
+    preview, deliveries = build_preview(students, academic_session, semester, channels, is_revised=is_revised)
     try:
         with transaction.atomic():
             batch = ResultShareBatch.objects.create(id=request_id, created_by=user,
                 academic_session=academic_session, semester=semester, student_ids=ids,
-                channels=channels, preview=preview, history_digest=digest(preview))
+                channels=channels, is_revised=is_revised, revision_reason=revision_reason, preview=preview, history_digest=digest(preview))
     except IntegrityError:
         # A concurrent request with a reused UUID can have a disjoint student set.
         raise ValidationError("This request_id already exists. Refresh the original request.") from None
@@ -157,7 +169,8 @@ def queue_batch(*, user, batch, expected_digest):
     if batch.queued_at:
         return batch  # Repeated clicks do not create or resend deliveries.
     students = lock_students(batch.student_ids)
-    current, _ = build_preview(students, batch.academic_session, batch.semester, batch.channels)
+    current, _ = build_preview(students, batch.academic_session, batch.semester, batch.channels,
+        include_pdf=uses_pdf(batch.preview), is_revised=batch.is_revised)
     if digest(current) != batch.history_digest:
         raise ValidationError("Results or guardian details changed. Create a fresh preview.")
     pending = batch.deliveries.filter(status="draft")
@@ -199,8 +212,15 @@ def retry_failed(*, user, batch):
 
 # Serialize a batch preview with delivery-state counts and bounded status details.
 def batch_data(batch):
+    preview = copy.deepcopy(batch.preview)
+    for item in preview:
+        snapshot = (item.get("report") or {}).get("pdf")
+        if snapshot:
+            snapshot.pop("content_base64", None)
+            snapshot["url"] = reverse("result-share-pdf", kwargs={
+                "batch_id": batch.pk, "student_id": item["student_id"]})
     counts = Counter(batch.deliveries.values_list("status", flat=True))
-    return {"id": str(batch.pk), "history_digest": batch.history_digest,
-        "queued_at": batch.queued_at, "preview": batch.preview, "counts": dict(counts),
+    return {"id": str(batch.pk), "is_revised": batch.is_revised, "revision_reason": batch.revision_reason, "history_digest": batch.history_digest,
+        "queued_at": batch.queued_at, "preview": preview, "counts": dict(counts),
         "deliveries": list(batch.deliveries.order_by("pk").values("id", "student_id", "guardian_id",
             "channel", "part_number", "destination", "status", "diagnostic_code", "attempts", "provider_id"))}

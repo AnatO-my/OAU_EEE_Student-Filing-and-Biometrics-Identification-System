@@ -306,7 +306,11 @@ def bulk_change_student_statuses(*, user, validated_data):
     for student in students:
         student.academic_status = target_status
 
-    Student.objects.bulk_update(students, ["academic_status"])
+    if target_status in {"graduated", "withdrawn", "left"}:
+        from django.contrib.auth import get_user_model
+        for student in students: student.is_active = False
+        get_user_model().objects.filter(pk__in=[s.user_id for s in students if s.user_id]).update(is_active=False)
+    Student.objects.bulk_update(students, ["academic_status", "is_active"])
     return len(students)
 
 
@@ -350,3 +354,23 @@ def update_guardian(*, user, guardian, validated_data):
     guardian.full_clean()
     guardian.save()
     return guardian
+
+
+@transaction.atomic
+def correct_student_identifier(*, user, student, identifier_value, expected_identifier_value):
+    """HOD-reviewed correction preserves UUID, aliases, and immutable identity history."""
+    from accounts.administration import require_fresh_hod
+    from documents.workflow import lock_student_actor
+    user, student = lock_student_actor(user, student.pk)
+    require_fresh_hod(user)
+    if student.identifier_key != identifier_key(expected_identifier_value):
+        raise ValidationError("The identifier changed. Refresh the correction request.")
+    reject_unavailable_identifier(identifier_value, student.pk)
+    previous_value = student.identifier_value
+    student.identifier_value = identifier_value.strip()
+    save_registered_student(student)
+    if previous_value != student.identifier_value:
+        StudentIdentityChange.objects.create(student=student, previous_type=student.identifier_type,
+            previous_value=previous_value, identifier_type=student.identifier_type,
+            identifier_value=student.identifier_value, actor=user)
+    return student

@@ -20,6 +20,18 @@ from .models import AccountAdministrationAudit, AdviserAssignment, HODMessage, U
 from .services import send_hod_message
 
 
+def complete_accepted_handover(*, actor, target_staff_id, **unused_legacy_confirmation):
+    """Exercise the accepted lifecycle where old tests need a completed transfer."""
+    from django.db import transaction
+    from accounts import administration
+    from accounts.batch_services import offer_handover, accept_handover
+    with transaction.atomic():
+        administration.locked_users(actor, target_staff_id)
+        offered = offer_handover(actor=actor, target_id=target_staff_id)
+        return accept_handover(actor=User.objects.get(pk=target_staff_id), handover_id=offered.pk)
+
+
+
 class AdministrationFixture:
     password = "Synthetic!HOD-7281-Cedar"
 
@@ -186,10 +198,14 @@ class AccountAdministrationTests(AdministrationFixture, TestCase):
         second_hod = User.objects.create_superuser("unrelated-hod", "other@example.test", self.password)
         permission = Permission.objects.get(content_type__app_label="students", codename="view_student")
         self.hod.user_permissions.add(permission)
-        response = self.client.post("/api/accounts/transfer-hod/", self.handover(), format="json")
+        response = self.client.post("/api/workflows/handover/", {"target_id": self.staff.pk}, format="json")
         self.assertEqual(response.status_code, 200, response.data)
-        self.assertEqual(response.data["user"]["role"], "staff")
-        self.assertEqual(response.data["target"]["role"], "hod")
+        self.hod.refresh_from_db()
+        self.assertTrue(self.hod.is_superuser)
+        recipient = APIClient()
+        recipient.force_authenticate(self.staff)
+        accepted = recipient.post("/api/workflows/handover/", {"handover_id": response.data["id"]}, format="json")
+        self.assertEqual(accepted.status_code, 200, accepted.data)
         self.hod.refresh_from_db()
         self.staff.refresh_from_db()
         second_hod.refresh_from_db()
@@ -197,7 +213,7 @@ class AccountAdministrationTests(AdministrationFixture, TestCase):
         self.assertTrue(self.hod.has_perm("students.view_student"))
         self.assertTrue(self.staff.is_superuser and self.staff.is_active)
         self.assertTrue(second_hod.is_superuser)
-        self.assertEqual(AccountAdministrationAudit.objects.filter(action="hod_transferred").count(), 1)
+        self.assertEqual(AccountAdministrationAudit.objects.filter(action="hod_transfer_accepted").count(), 1)
         self.assertEqual(self.client.get("/api/accounts/staff/").status_code, 403)
         new_hod_client = APIClient()
         new_hod_client.force_authenticate(self.staff)
@@ -220,7 +236,7 @@ class AccountAdministrationTests(AdministrationFixture, TestCase):
 
     def test_loaded_hod_cannot_send_any_audience_after_ownership_transfer(self):
         AdviserAssignment.objects.create(staff=self.other, academic_session="2026/2027", level=100)
-        transfer_hod(actor=self.hod, **self.handover())
+        complete_accepted_handover(actor=self.hod, **self.handover())
         self.assertTrue(self.hod.is_superuser)  # The stale instance still claims HOD.
         for audience in ({"audience": "adviser", "adviser_id": self.other.pk},
                 {"audience": "individual", "recipient_id": self.student.pk},
@@ -241,7 +257,7 @@ class HODTransferConcurrencyTests(AdministrationFixture, TransactionTestCase):
             try:
                 actor = User.objects.get(pk=self.hod.pk)
                 barrier.wait(timeout=10)
-                transfer_hod(actor=actor, target_staff_id=target.pk, expected_target_username=target.username,
+                complete_accepted_handover(actor=actor, target_staff_id=target.pk, expected_target_username=target.username,
                     current_password=self.password, confirmation="TRANSFER HOD")
                 return "won"
             except PermissionDenied:
@@ -253,7 +269,7 @@ class HODTransferConcurrencyTests(AdministrationFixture, TransactionTestCase):
             outcomes = list(workers.map(attempt, [self.staff, self.other]))
         self.assertCountEqual(outcomes, ["won", "denied"])
         self.assertEqual(User.objects.filter(is_superuser=True, is_staff=True, is_active=True).count(), 1)
-        self.assertEqual(AccountAdministrationAudit.objects.filter(action="hod_transferred").count(), 1)
+        self.assertEqual(AccountAdministrationAudit.objects.filter(action="hod_transfer_accepted").count(), 1)
 
     @override_settings(CURRENT_ACADEMIC_SESSION="2026/2027")
     def test_assignment_edit_and_hod_message_follow_compatible_user_then_assignment_locks(self):

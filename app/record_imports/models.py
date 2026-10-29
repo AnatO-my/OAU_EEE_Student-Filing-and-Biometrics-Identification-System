@@ -22,6 +22,7 @@ class ImportBatch(models.Model):
     file_sha256 = models.CharField(max_length=64)
     source_csv = models.TextField()
     parsed_rows = models.JSONField()
+    source_context = models.JSONField(default=dict)
     preview = models.JSONField()
     preview_digest = models.CharField(max_length=64)
     revision = models.PositiveIntegerField(default=1)
@@ -51,3 +52,20 @@ class ImportChange(models.Model):
     class Meta:
         default_permissions = ()
         constraints = [models.UniqueConstraint(fields=["batch", "row_number"], name="unique_record_import_change_row")]
+
+
+class SourcePerformance(models.Model):
+    """Immutable reported figures and comparison evidence, never replacement results."""
+    batch = models.ForeignKey(ImportBatch, on_delete=models.PROTECT, related_name="source_performances")
+    student = models.ForeignKey("students.Student", on_delete=models.PROTECT, related_name="source_performances")
+    academic_session = models.ForeignKey("academics.AcademicSession", on_delete=models.PROTECT)
+    semester = models.CharField(max_length=10)
+    source = models.JSONField()
+    comparison_at_import = models.JSONField()
+    review_status = models.CharField(max_length=20, default="unresolved")
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        default_permissions = ()
+        constraints = [models.UniqueConstraint(fields=["batch", "student", "academic_session", "semester"],
+            name="unique_import_source_performance")]

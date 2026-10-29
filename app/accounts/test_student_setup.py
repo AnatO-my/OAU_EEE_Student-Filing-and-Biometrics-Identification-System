@@ -24,6 +24,18 @@ from .models import AccountAdministrationAudit, User
 from .student_setup import confirm_student_setup, issue_student_setup, student_setup_tokens
 
 
+def complete_accepted_handover(*, actor, target_staff_id, **unused_legacy_confirmation):
+    """Exercise the accepted lifecycle where old tests need a completed transfer."""
+    from django.db import transaction
+    from accounts import administration
+    from accounts.batch_services import offer_handover, accept_handover
+    with transaction.atomic():
+        administration.locked_users(actor, target_staff_id)
+        offered = offer_handover(actor=actor, target_id=target_staff_id)
+        return accept_handover(actor=User.objects.get(pk=target_staff_id), handover_id=offered.pk)
+
+
+
 class StudentSetupFixture:
     password = "Synthetic!Student-7295-Cedar"
 
@@ -41,9 +53,20 @@ class StudentSetupFixture:
         self.account_url = f"/api/students/{self.student.pk}/account/"
         self.confirm_url = "/api/auth/student/setup/confirm/"
 
+    def seed_legacy_account(self, **values):
+        self.student.refresh_from_db()
+        if self.student.user_id is None:
+            account = User(username=values.get("username", "setup-student"), email=values.get("email", "student@example.test"), is_active=True)
+            account.set_unusable_password()
+            account.full_clean()
+            account.save()
+            self.student.user=account
+            self.student.save(update_fields=["user"])
+        return self.student.user
+
     def issue(self, **values):
-        return issue_student_setup(actor=self.hod, student_id=self.student.pk,
-            values=values or {"username": "setup-student", "email": "student@example.test"})
+        self.seed_legacy_account(**values)
+        return issue_student_setup(actor=self.hod, student_id=self.student.pk, values={})
 
     def confirm_body(self, issued, **changes):
         return {"uid": issued["uid"], "token": issued["token"], "new_password": self.password, **changes}
@@ -55,7 +78,10 @@ class StudentSetupTests(StudentSetupFixture, TestCase):
         self.assertIsNone(initial["account"])
         self.assertEqual(initial["preferred_username"], self.student.identifier_value)
         before_students = Student.objects.count()
-        response = self.client.post(self.issue_url, {"username": "chosen-student"}, format="json")
+        rejected = self.client.post(self.issue_url, {"username": "chosen-student"}, format="json")
+        self.assertEqual(rejected.status_code, 400, rejected.data)
+        self.seed_legacy_account(username="chosen-student",email="")
+        response = self.client.post(self.issue_url, {}, format="json")
         self.assertEqual(response.status_code, 200, response.data)
         self.assertEqual(response.data["expires_in"], settings.PASSWORD_RESET_TIMEOUT)
         self.assertIn("no-store", response.headers["Cache-Control"])
@@ -206,7 +232,7 @@ class StudentSetupTests(StudentSetupFixture, TestCase):
         reissued = self.client.post(self.issue_url, {}, format="json").data
         confirm_student_setup(**self.confirm_body(reissued))
         events = list(AccountAdministrationAudit.objects.order_by("id"))
-        self.assertEqual([event.action for event in events], ["student_setup_issued", "student_setup_reissued", "student_setup_completed"])
+        self.assertEqual([event.action for event in events], ["student_setup_reissued", "student_setup_reissued", "student_setup_completed"])
         encoded = json.dumps([{**event.before, **event.after} for event in events])
         self.assertNotIn(issued["token"], encoded)
         self.assertNotIn(reissued["token"], encoded)
@@ -316,7 +342,7 @@ class StudentSetupConcurrencyTests(StudentSetupFixture, TransactionTestCase):
             close_old_connections()
             try:
                 with patch("accounts.administration.locked_users", side_effect=pause_after_users):
-                    transfer_hod(actor=User.objects.get(pk=self.hod.pk), target_staff_id=self.staff.pk,
+                    complete_accepted_handover(actor=User.objects.get(pk=self.hod.pk), target_staff_id=self.staff.pk,
                         expected_target_username=self.staff.username, current_password=self.password, confirmation="TRANSFER HOD")
             finally:
                 close_old_connections()

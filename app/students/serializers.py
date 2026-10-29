@@ -32,7 +32,7 @@ class StudentSerializer(serializers.ModelSerializer):
             "student_id",
             "identifier_type",
             "identifier_value",
-            "full_name",
+            "full_name", "programme",
             "surname",
             "phone_number",
             "admission_year",

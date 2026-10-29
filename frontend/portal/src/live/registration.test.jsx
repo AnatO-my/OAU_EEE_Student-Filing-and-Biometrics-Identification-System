@@ -32,6 +32,17 @@ function approve() {
 beforeEach(() => { vi.clearAllMocks(); api.prepareRecordImport.mockImplementation(async (value) => ({ format: 'canonical_csv', csv_text: new TextDecoder('utf-8', { fatal: true, ignoreBOM: true }).decode(await value.arrayBuffer()), filename: value.name, source_sha256: 'source-digest', summary: { source_course_rows: 1, accepted_rows: 1, unresolved_rows: 0 }, issues: [], trace: [] })); api.listRecordImports.mockResolvedValue({ results: [], count: 0, next: null }); api.previewRecordImport.mockResolvedValue(batch); api.commitRecordImport.mockResolvedValue(committed); });
 afterEach(cleanup);
 
+it('carries reported source context into the saved preview without bypassing review', async () => {
+  const sourceContext = { format: 'student_records_csv', source_sha256: 'synthetic-source', csv_sha256: 'synthetic-csv', records: [] };
+  api.prepareRecordImport.mockResolvedValue({ format: 'canonical_csv', csv_text: csv, filename: 'results.csv',
+    source_context: sourceContext, summary: { accepted_rows: 1 } });
+  imports();
+  await previewFile();
+  expect(api.previewRecordImport).toHaveBeenCalledWith(expect.objectContaining({ source_context: sourceContext }));
+  expect(screen.getByRole('button', { name: 'Commit reviewed import' }).disabled).toBe(true);
+  expect(api.commitRecordImport).not.toHaveBeenCalled();
+});
+
 describe('adviser registration and profile completion', () => {
   it('hides registration when permission or current adviser assignment is missing', () => {
     const { rerender } = render(<StudentRegistration user={{ ...adviser, permissions: ['students.view_student'] }} />);

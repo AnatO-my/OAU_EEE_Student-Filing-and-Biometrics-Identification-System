@@ -160,13 +160,13 @@ int main() {
   capture(true); assert(images==before); // Menus never take attendance.
   advance(20001); assert(attendanceTerminal.page()==0);
   assert(std::string(terminalHardware.last.line[0])=="ATTENDANCE");
-  assert(std::string(terminalHardware.last.line[6])=="ENROLL A FINGER");
+  assert(std::string(terminalHardware.last.line[3])=="ENROLL A FINGER");
   reset(); slots[1]=true; attendanceTerminal.resume(); advance(1000);
-  assert(std::string(terminalHardware.last.line[6])=="SET CLOCK TO RECORD");
+  assert(std::string(terminalHardware.last.line[3])=="SET CLOCK TO RECORD");
   terminalHardware.clockPresent=true; advance(1000);
-  assert(std::string(terminalHardware.last.line[6])=="CHECK LOG STORAGE");
+  assert(std::string(terminalHardware.last.line[3])=="CHECK LOG STORAGE");
   terminalHardware.fsOK=true; attendanceTerminal.resume(); advance(1000);
-  assert(std::string(terminalHardware.last.line[6])=="READY FOR ATTENDANCE");
+  assert(std::string(terminalHardware.last.line[3])=="READY FOR ATTENDANCE");
   reset(); authenticated=false; attendanceTerminal.key(2); attendanceTerminal.key(2);
   attendanceTerminal.key(0); assert(terminalHardware.exports==1); // Sensor offline doesn't block menus.
 

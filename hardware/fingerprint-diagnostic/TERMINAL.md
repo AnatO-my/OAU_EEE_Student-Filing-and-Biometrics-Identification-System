@@ -94,6 +94,15 @@ Export log → ENROLL to print saved CSV over USB.
 
 ## OLED noise and controller choice
 
+After the 28 October integrity test, the user reported faults on individual
+pixel lines 2, 4, 6, 8, 10 and 12. The terminal reserves the first 16 pixel lines
+and renders six 21-character text rows at y=16..63. The top band is cleared in
+each generated frame. Home, Statistics, notices, the clock editor, mode/start
+menus, exports and maintenance use the same layout; the full class-session UUID
+remains visible across two lines. Template totals are on Statistics. This is a
+display workaround; physical confirmation of the revised terminal is pending.
+See [the integrity test and reported result](OLED_TEST.md#top-two-row-integrity-test---28-october-2026).
+
 The display transport now explicitly selects each page and column, clears all
 display RAM while the panel is off, and then writes bounded data chunks. It no
 longer depends on SSD1306 horizontal-window commands, which do not provide the

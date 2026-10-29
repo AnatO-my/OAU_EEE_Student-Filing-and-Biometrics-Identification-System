@@ -4,7 +4,6 @@ from django.contrib.auth import get_user_model
 from django.core.exceptions import PermissionDenied, ValidationError
 from django.test import TestCase
 
-from app.academics.calculations import calculate_student_cgpa
 from students.models import Student
 
 from .models import AcademicSession, Course, CourseOffering, Result

@@ -1,0 +1,1 @@
+run_id,case_id,repetition,role_handle,device_run_id,input_fixture,expected,actual,status,start_event,end_event,elapsed_ms,evidence_paths,notes

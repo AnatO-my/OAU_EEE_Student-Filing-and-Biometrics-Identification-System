@@ -253,6 +253,8 @@ class ResultShareBatch(models.Model):
     academic_session = models.ForeignKey(AcademicSession, on_delete=models.PROTECT)
     semester = models.CharField(max_length=10, choices=CourseOffering.Semester.choices)
     student_ids = models.JSONField()
+    is_revised = models.BooleanField(default=False)
+    revision_reason = models.CharField(max_length=1000, blank=True)
     channels = models.JSONField()
     preview = models.JSONField()
     history_digest = models.CharField(max_length=64)

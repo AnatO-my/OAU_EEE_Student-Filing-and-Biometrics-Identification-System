@@ -1,0 +1,11 @@
+identifier_type,identifier_value,course_code,academic_session,semester,attempt_number,score
+matriculation,EVAL/001,EVAL201,2026/2027,harmattan,1,78
+matriculation,EVAL/001,EVAL203,2026/2027,harmattan,1,64
+matriculation,EVAL/001,EVAL205,2026/2027,harmattan,1,55
+matriculation,EVAL/001,EVAL207,2026/2027,harmattan,1,48
+matriculation,EVAL/001,EVAL209,2026/2027,harmattan,1,35
+matriculation,EVAL/002,EVAL201,2026/2027,harmattan,1,78
+matriculation,EVAL/002,EVAL203,2026/2027,harmattan,1,64
+matriculation,EVAL/002,EVAL205,2026/2027,harmattan,1,55
+matriculation,EVAL/002,EVAL207,2026/2027,harmattan,1,48
+matriculation,EVAL/002,EVAL209,2026/2027,harmattan,1,35
