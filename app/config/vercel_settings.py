@@ -9,6 +9,10 @@ from django.core.exceptions import ImproperlyConfigured
 
 from .production_settings import *  # noqa: F403
 
+# Vercel's Django hook resolves this path relative to manage.py. The normal
+# config.wsgi module lives below app/, so use the root deployment wrapper here.
+WSGI_APPLICATION = "vercel_wsgi.application"
+
 
 if os.environ.get("DEMO_SYNTHETIC_ONLY") != "true":
     raise ImproperlyConfigured("Set DEMO_SYNTHETIC_ONLY=true for the synthetic demonstration.")
