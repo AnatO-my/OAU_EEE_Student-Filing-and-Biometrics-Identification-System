@@ -8,6 +8,10 @@ from students.models import Student
 
 def private_storage():
     """Where files are saved. No public URL points here."""
+    backend = getattr(settings, "PRIVATE_STORAGE_BACKEND", "")
+    if backend:
+        from django.utils.module_loading import import_string
+        return import_string(backend)()
     return FileSystemStorage(location=settings.PRIVATE_MEDIA_ROOT)
 
 import os

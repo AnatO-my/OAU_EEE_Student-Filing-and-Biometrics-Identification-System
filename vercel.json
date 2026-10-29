@@ -1,0 +1,43 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "services": {
+    "portal": {
+      "root": "frontend/portal",
+      "framework": "vite",
+      "installCommand": "npm ci --ignore-scripts --no-audit --no-fund",
+      "buildCommand": "npm run build",
+      "outputDirectory": "dist",
+      "rewrites": [{ "source": "/(.*)", "destination": "/index.html" }],
+      "headers": [{ "source": "/(.*)", "headers": [{ "key": "Cache-Control", "value": "no-store" }] }]
+    },
+    "api": {
+      "root": ".",
+      "framework": "django",
+      "entrypoint": "deployment.vercel_wsgi:application",
+      "functions": {
+        "deployment/vercel_wsgi.py": {
+          "maxDuration": 60,
+          "excludeFiles": "{frontend/**,docs/**,hardware/**,tests/**,fixtures/**,simulators/**,private-data/**,backups/**,output/**,tmp/**,.venv/**}"
+        }
+      }
+    }
+  },
+  "rewrites": [
+    { "source": "/api", "destination": { "service": "api" } },
+    { "source": "/api/(.*)", "destination": { "service": "api" } },
+    { "source": "/admin", "destination": { "service": "api" } },
+    { "source": "/admin/(.*)", "destination": { "service": "api" } },
+    { "source": "/static/(.*)", "destination": { "service": "api" } },
+    { "source": "/health/(.*)", "destination": { "service": "api" } },
+    { "source": "/(.*)", "destination": { "service": "portal" } }
+  ],
+  "headers": [
+    { "source": "/api/(.*)", "headers": [{ "key": "Cache-Control", "value": "private, no-store" }] },
+    { "source": "/admin/(.*)", "headers": [{ "key": "Cache-Control", "value": "private, no-store" }] },
+    { "source": "/(.*)", "headers": [
+      { "key": "X-Content-Type-Options", "value": "nosniff" },
+      { "key": "Referrer-Policy", "value": "same-origin" },
+      { "key": "X-Frame-Options", "value": "DENY" }
+    ] }
+  ]
+}

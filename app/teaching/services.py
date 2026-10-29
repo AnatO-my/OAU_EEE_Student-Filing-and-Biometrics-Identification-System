@@ -155,14 +155,15 @@ def save_material(*, user, offering, event_id, title, reason, upload=None, mater
     data = b""
     filename = ""
     if not withdrawn:
-        if not upload or upload.size > 20 * 1024 * 1024:
-            raise ValidationError("Choose a material file up to 20 MiB.")
+        max_bytes = getattr(settings, "TEACHING_MAX_UPLOAD_BYTES", 20 * 1024 * 1024)
+        if not upload or upload.size > max_bytes:
+            raise ValidationError(f"Choose a material file up to {max_bytes // (1024 * 1024)} MiB.")
         filename = Path(upload.name.replace("\\", "/")).name[:255]
         extension = Path(filename).suffix.lower()
         if extension not in {".pdf", ".txt", ".csv", ".docx", ".pptx", ".xlsx"}:
             raise ValidationError("Use PDF, plain text, CSV or an Office document.")
-        data = upload.read(20 * 1024 * 1024 + 1)
-        if not data or len(data) > 20 * 1024 * 1024:
+        data = upload.read(max_bytes + 1)
+        if not data or len(data) > max_bytes:
             raise ValidationError("The material is empty or too large.")
         if extension == ".pdf" and not data.startswith(b"%PDF-"):
             raise ValidationError("The material is not a PDF file.")

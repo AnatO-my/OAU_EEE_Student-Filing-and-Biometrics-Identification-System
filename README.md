@@ -73,7 +73,9 @@ The plan illustrates these software folders beneath `software/`; the existing sc
 
 For the integrated laptop setup, use [the local application guide](docs/local-laptop.md).
 It starts the React portal and Django against the verified Aiven database;
-email delivery is an explicit option. Hosting is currently deferred.
+email delivery is an explicit option.
+The newly authorized Vercel demonstration is being prepared separately; see
+[Vercel demo deployment](docs/vercel-demo.md) for its free-plan check and current status.
 Student registration and reviewed master-sheet imports are documented in the
 [registration guide](docs/student-registration.md) and
 [import workflow](docs/student-result-imports.md), with

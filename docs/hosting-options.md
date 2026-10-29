@@ -1,5 +1,10 @@
 # Hosting checkpoint — 21 October 2026
 
+**29 October update:** The user has now authorized a Vercel demonstration if it
+meets the $0/no-card constraint. See [Vercel demo preparation](vercel-demo.md) for
+current payment evidence, configuration, checks and the pending account connection.
+The older deferred status below describes the 21 October checkpoint.
+
 **Deferred at the user's request. The active target is this Windows laptop.**
 No hosting account was created, no cloud resource was provisioned, no repository
 was published and no deployment or email delivery occurred during this work.

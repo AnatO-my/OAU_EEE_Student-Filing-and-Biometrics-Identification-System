@@ -53,6 +53,7 @@ Thumbs.db
 /file_system/
 /output/
 .coverage.*
+.vercel/
 coverage.xml
 junit.xml
 *.bak
