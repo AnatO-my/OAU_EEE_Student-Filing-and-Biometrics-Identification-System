@@ -1,4 +1,5 @@
 import { useState } from "react";
+import loginPhoto from "../assets/login-classroom.jpg";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
 import Sectionheader from "../components/Sectionheader";
@@ -319,7 +320,7 @@ const Login = () => {
           border-radius: 12px;
           overflow: hidden;
           border: 1px solid rgba(31, 69, 126, 0.15);
-          background-image: url("https://images.unsplash.com/photo-1522202176988-66273c2fd55f?auto=format&fit=crop&w=900&q=80");
+          background-image: url("${loginPhoto}");
           background-size: cover;
           background-position: center;
           box-shadow: 0 10px 28px rgba(34, 57, 89, 0.18);

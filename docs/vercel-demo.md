@@ -1,11 +1,18 @@
 # Vercel demonstration deployment
 
 Prepared on 29 October 2026. **Not deployed or verified on Vercel yet.**
-The account connection and account-specific no-card eligibility are still pending.
-The user authorized deployment if it meets the existing $0/no-card requirement.
-The official Vercel CLI 65.7.0 was installed in ignored temporary tooling and
-reports **Logged out**. No account, deployment, payment method or paid resource
-was created. The Vercel plugin connection is also pending.
+The connected Vercel account and team report an active **Hobby** plan, with no
+trial. Project `oau-eee-demo` was created using the default free build resources;
+no payment method, upgrade, paid integration or domain purchase was requested.
+The authenticated Vercel plugin is available. The separately installed CLI
+65.7.0 remains logged out; plugin deployment does not depend on CLI login.
+
+The project belongs to team `agunotanamayokun-8763`. Its local ignored link records
+project `prj_35esrceLjCFrcVa8Pg76dPHbOMsY` and team
+`team_VGJQbjcF1OQlI79kBLNpke69`. Default deployment protection remains enabled.
+The user has connected GitHub after Vercel initially rejected repository import.
+The Git build, isolated database setup, environment provisioning and live checks
+remain pending. Do not interpret project creation as a working deployment.
 
 ## Payment check
 
@@ -78,6 +85,21 @@ Git-connected deployment from the reviewed feature branch, not a directory uploa
 3. Create a separate `eee_demo_...` database and dedicated application role on
    the existing free Aiven service. Do not copy real student data or the existing
    integration database. Do not run the application with the Aiven administrator.
+   On this Windows workstation, after checking the local Vercel project link,
+   run this in a separate PowerShell process from the repository root:
+
+   ```powershell
+   powershell -NoProfile -File .\scripts\prepare-vercel-demo.ps1
+   ```
+
+   It uses the ignored Aiven service profile and either inherits the configured
+   password or requests it at a hidden prompt. It creates a randomly named empty
+   database and a dedicated role limited to five connections, then checks TLS
+   and role privileges. It never migrates or copies the integration database.
+   Only the new demo credentials are retained, encrypted with Windows DPAPI in
+   ignored `private-data/vercel-demo/environment.dpapi`; the administrator password
+   is never saved. An existing bundle is not overwritten. If creation fails,
+   inspect its stage before retrying because database creation is not transactional.
 4. Set the private environment values from
    [the variable template](../deployment/vercel.env.example). Set the exact public
    hostname after Vercel assigns it. Use a stable generated Django secret.
@@ -96,10 +118,11 @@ Git-connected deployment from the reviewed feature branch, not a directory uploa
    accounts with private passwords. Do not commit passwords or seed a public
    default administrator password. `demo_hosting` migrations also create the shared
    cache table; no separate `createcachetable` step is needed.
-6. Deploy a preview and verify `/health/live/`, `/health/ready/`, admin CSS,
+6. Deploy with production configuration and verify `/health/live/`, `/health/ready/`, admin CSS,
    direct SPA routes, login/CSRF/logout, staff and student permission boundaries,
    result/attendance flows, and document/material upload and authorized download.
    Prove that uploads remain readable from a subsequent function invocation.
+   Prefer staging without assigning domains, then promote the tested build.
    Preview and production should not silently share databases or queue consumers.
 7. Promote only the verified synthetic demonstration. Record the exact URL,
    source revision, plan, test outcome and demo database identifier here.

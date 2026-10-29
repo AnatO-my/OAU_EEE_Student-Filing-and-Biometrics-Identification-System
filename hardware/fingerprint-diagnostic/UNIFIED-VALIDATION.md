@@ -54,3 +54,15 @@ performed for this change. Bench tests must confirm physical button switching,
 display text, LED/buzzer timing and sustained/reboot behavior on the assembled
 terminal. Automatic enrollment upload/database binding, compatible identity/time
 reconciliation and student/class attendance promotion remain separate gaps.
+
+## Connected red-LED check — 29 October 2026
+
+COM12 responded at 115200 baud; scanner UART was 57600 baud, with capacity 150
+and eight stored templates. With the finger kept off the scanner, the existing
+enrollment finger-wait screen reached ACTION TIMED OUT. The user heard two short
+beeps but observed no external red LED. The visual red-LED check therefore did
+not pass; buzzer feedback alone does not verify the GPIO19 voltage or LED wiring.
+No firmware was flashed. Read-only reports before/after both showed eight stored
+templates. The terminal was left paused after the test. Next inspect wiring,
+polarity/resistor/common ground and measure GPIO19 during error feedback before
+attributing the failure to hardware or firmware.
