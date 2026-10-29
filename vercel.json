@@ -13,9 +13,9 @@
     "api": {
       "root": ".",
       "framework": "django",
-      "entrypoint": "deployment.vercel_wsgi:application",
+      "entrypoint": "vercel_wsgi:application",
       "functions": {
-        "deployment/vercel_wsgi.py": {
+        "vercel_wsgi.py": {
           "maxDuration": 60,
           "excludeFiles": "{frontend/**,docs/**,hardware/**,tests/**,fixtures/**,simulators/**,private-data/**,backups/**,output/**,tmp/**,.venv/**}"
         }

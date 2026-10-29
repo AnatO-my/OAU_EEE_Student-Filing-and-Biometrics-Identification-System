@@ -40,7 +40,9 @@ remain pending. Do not interpret project creation as a working deployment.
 `vercel.json` uses Vercel Services. The frontend service builds `frontend/portal`
 and retains access to the sibling `frontend/guardian-results/src` dependency.
 The repository is the project root. The Python service loads
-`deployment/vercel_wsgi.py`, which selects `config.vercel_settings`.
+`vercel_wsgi.py`, which selects `config.vercel_settings`. The entrypoint lives at
+the repository root so dependency discovery uses the main requirements rather
+than the separate Docker deployment requirements.
 
 `/api`, `/admin`, `/static` and `/health` reach Django; other paths reach the SPA.
 The browser keeps same-origin session cookies and CSRF checks. API/admin responses

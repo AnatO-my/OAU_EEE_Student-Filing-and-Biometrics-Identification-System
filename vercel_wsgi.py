@@ -3,7 +3,7 @@ import os
 import sys
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "app"))
+sys.path.insert(0, str(Path(__file__).resolve().parent / "app"))
 os.environ["DJANGO_SETTINGS_MODULE"] = "config.vercel_settings"
 
 from django.core.wsgi import get_wsgi_application  # noqa: E402
