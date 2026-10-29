@@ -20,3 +20,6 @@ namespaces = false
 
 [tool.setuptools.dynamic]
 dependencies = {file = ["requirements.txt"]}
+
+[tool.vercel]
+entrypoint = "vercel_wsgi:application"
