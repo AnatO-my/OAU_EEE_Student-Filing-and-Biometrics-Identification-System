@@ -1,18 +1,43 @@
 # Vercel demonstration deployment
 
-Prepared on 29 October 2026. **Not deployed or verified on Vercel yet.**
+Staged on 29 October 2026; verification resumed on 5 November 2026.
+**The hosted build is READY, but release verification is still in progress.**
 The connected Vercel account and team report an active **Hobby** plan, with no
 trial. Project `oau-eee-demo` was created using the default free build resources;
 no payment method, upgrade, paid integration or domain purchase was requested.
-The authenticated Vercel plugin is available. The separately installed CLI
-65.7.0 remains logged out; plugin deployment does not depend on CLI login.
+The authenticated Vercel plugin and CLI 65.7.0 are available. The user completed
+the CLI device sign-in so locally encrypted demo secrets could be transferred
+directly to Vercel without exposing them in chat or command arguments.
 
 The project belongs to team `agunotanamayokun-8763`. Its local ignored link records
 project `prj_35esrceLjCFrcVa8Pg76dPHbOMsY` and team
 `team_VGJQbjcF1OQlI79kBLNpke69`. Default deployment protection remains enabled.
-The user has connected GitHub after Vercel initially rejected repository import.
-The Git build, isolated database setup, environment provisioning and live checks
-remain pending. Do not interpret project creation as a working deployment.
+The GitHub login connection is present, but Vercel still rejected linking the
+repository. Deployment therefore uses the CLI from the reviewed feature branch;
+automatic deployment on push is not configured.
+
+Deployment `dpl_EhuUR6WgGnWJFKqo78L1JL9g1oMA` is **READY** at
+<https://oau-eee-demo-53l6xmwrh-agunotanamayokun-8763.vercel.app>, built from
+`204697b4a218a16cbdfa471bf24b54b5429a7f03`. It was staged with `--prod --skip-domain`.
+The frontend and Python 3.13/Django service both built successfully. The isolated
+demo database was migrated and populated with synthetic accounts/courses/results;
+14 production environment variables were configured, with private values stored
+as Vercel Secrets. Email remains disabled.
+
+On 5 November, the user powered the existing free Aiven service back on after its
+hostname disappeared from DNS. Hosted database readiness then returned HTTP 200.
+The staged build passed staff/student login and logout, CSRF, results/attendance
+reads, staff-only and cross-student restrictions, direct SPA routing, admin CSS,
+document upload/download and teaching-material upload/download. Downloads matched
+the uploaded bytes across separate HTTP requests. Direct PostgreSQL checks also
+confirmed that two concurrent uploads cannot exceed the quota and a rolled-back
+upload leaves neither a file nor a quota change.
+
+The final hostname is
+<https://oau-eee-demo-agunotanamayokun-8763.vercel.app>.
+The shorter `oau-eee-demo.vercel.app` belongs to another project and was not
+claimed or modified. Production hostname/origin settings were updated to the
+assigned address; a final build and promotion apply those values.
 
 ## Payment check
 
@@ -102,6 +127,9 @@ Git-connected deployment from the reviewed feature branch, not a directory uploa
    ignored `private-data/vercel-demo/environment.dpapi`; the administrator password
    is never saved. An existing bundle is not overwritten. If creation fails,
    inspect its stage before retrying because database creation is not transactional.
+   Existing demo login passwords can be viewed privately on the same Windows
+   account with `powershell -NoProfile -File .\scripts\show-demo-accounts.ps1`.
+   This reads the encrypted `accounts.dpapi` file; it never changes passwords.
 4. Set the private environment values from
    [the variable template](../deployment/vercel.env.example). Set the exact public
    hostname after Vercel assigns it. Use a stable generated Django secret.

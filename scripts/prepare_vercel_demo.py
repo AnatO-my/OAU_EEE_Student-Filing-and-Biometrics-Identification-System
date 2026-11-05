@@ -44,8 +44,8 @@ def plan():
     bundle = {"project_id": link["projectId"], "team_id": link["orgId"], "environment": {
         "DJANGO_SETTINGS_MODULE": "config.vercel_settings",
         "DJANGO_SECRET_KEY": secrets.token_urlsafe(60),
-        "DJANGO_ALLOWED_HOSTS": "oau-eee-demo.vercel.app",
-        "DEMO_PUBLIC_ORIGIN": "https://oau-eee-demo.vercel.app",
+        "DJANGO_ALLOWED_HOSTS": "oau-eee-demo-agunotanamayokun-8763.vercel.app",
+        "DEMO_PUBLIC_ORIGIN": "https://oau-eee-demo-agunotanamayokun-8763.vercel.app",
         "DEMO_SYNTHETIC_ONLY": "true",
         "POSTGRES_HOST": os.environ["POSTGRES_HOST"],
         "POSTGRES_PORT": os.environ.get("POSTGRES_PORT", "5432"),
