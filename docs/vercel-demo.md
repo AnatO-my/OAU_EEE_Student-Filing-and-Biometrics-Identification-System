@@ -1,7 +1,9 @@
 # Vercel demonstration deployment
 
-Staged on 29 October 2026; verification resumed on 5 November 2026.
-**The hosted build is READY, but release verification is still in progress.**
+Staged on 29 October 2026; verified and promoted on 5 November 2026.
+**The demonstration is live at <https://oau-eee-demo.vercel.app>.**
+This short address redirects to the canonical public portal at
+<https://oau-eee-demo-agunotanamayokun-8763.vercel.app>.
 The connected Vercel account and team report an active **Hobby** plan, with no
 trial. Project `oau-eee-demo` was created using the default free build resources;
 no payment method, upgrade, paid integration or domain purchase was requested.
@@ -16,13 +18,17 @@ The GitHub login connection is present, but Vercel still rejected linking the
 repository. Deployment therefore uses the CLI from the reviewed feature branch;
 automatic deployment on push is not configured.
 
-Deployment `dpl_EhuUR6WgGnWJFKqo78L1JL9g1oMA` is **READY** at
-<https://oau-eee-demo-53l6xmwrh-agunotanamayokun-8763.vercel.app>, built from
-`204697b4a218a16cbdfa471bf24b54b5429a7f03`. It was staged with `--prod --skip-domain`.
+Deployment `dpl_4VfhHmLaUHRgFEXGHNvhsjoYu4Hg` is **READY** at
+<https://oau-eee-demo-qe7jqzusx-agunotanamayokun-8763.vercel.app>, built from
+`9d73815d021d40b7d548a5c0ed404996bdd53bfc`. It was staged with
+`--prod --skip-domain`, verified, and then promoted to production.
+Use the public portal above; the unique deployment URL retains Vercel protection.
 The frontend and Python 3.13/Django service both built successfully. The isolated
 demo database was migrated and populated with synthetic accounts/courses/results;
 14 production environment variables were configured, with private values stored
 as Vercel Secrets. Email remains disabled.
+The isolated database is `eee_demo_20261029_eef6dfb3`; existing integration data
+was not copied or modified.
 
 On 5 November, the user powered the existing free Aiven service back on after its
 hostname disappeared from DNS. Hosted database readiness then returned HTTP 200.
@@ -33,11 +39,25 @@ the uploaded bytes across separate HTTP requests. Direct PostgreSQL checks also
 confirmed that two concurrent uploads cannot exceed the quota and a rolled-back
 upload leaves neither a file nor a quota change.
 
-The final hostname is
-<https://oau-eee-demo-agunotanamayokun-8763.vercel.app>.
-The shorter `oau-eee-demo.vercel.app` belongs to another project and was not
-claimed or modified. Production hostname/origin settings were updated to the
-assigned address; a final build and promotion apply those values.
+The final release passed 12 additional hosted checks, including login/logout and
+byte-for-byte retrieval of documents and teaching materials uploaded before the
+rebuild. After promotion, unauthenticated HTTPS requests to the canonical portal
+and `/health/ready/` both returned HTTP 200; readiness reported `{"status":"ok"}`.
+The short address returned HTTP 307 to the canonical portal. Both domains are
+verified on this same project; the earlier duplicate-domain error did not mean
+that the short address belonged to another project. Production hostname/origin
+settings match the canonical address. The final deployment's recent error/fatal
+log scan returned no entries.
+
+Demo passwords remain encrypted locally. From the repository root, view them in
+your own PowerShell window with:
+
+```powershell
+powershell -NoProfile -File .\scripts\show-demo-accounts.ps1
+```
+
+Keep the existing Aiven service running for the demonstration. If it is powered
+off, resume the same free service; do not create a replacement paid service.
 
 ## Payment check
 
@@ -101,7 +121,10 @@ The deployment excludes local secrets, databases, private media, backups, hardwa
 captures, report sources and generated output through `.vercelignore`. Prefer a
 Git-connected deployment from the reviewed feature branch, not a directory upload.
 
-## Resume deployment
+## Deployment procedure
+
+The initial deployment above is complete. These steps document setup and later
+releases; reuse the existing demo database and encrypted credentials for updates.
 
 1. Connect the Vercel plugin or authenticate the official CLI. Verify the Hobby
    plan and the absence of any card/payment requirement in the actual account.
@@ -173,5 +196,8 @@ and the optional demo migrations match the models.
 .\.venv\Scripts\python.exe manage.py makemigrations --check --dry-run --settings=config.demo_test_settings
 ```
 
-Vercel's actual build, Linux/Aiven connectivity, concurrent PostgreSQL upload quota
-behavior and live browser smoke checks remain required before claiming deployment.
+The hosted Vercel build, Linux/Aiven connectivity, PostgreSQL quota concurrency
+and rollback checks, and hosted HTTP authentication/data flows passed on
+5 November 2026. Public access was checked without a protection bypass token.
+Interactive browser visual verification was unavailable because the browser tool
+timed out; no visual verification is claimed.
